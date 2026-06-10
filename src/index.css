@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #0b0b0e;
+  color: #e7e7ea;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* scrollbars discretas na UI do editor */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a44 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #3a3a44;
+  border-radius: 4px;
+}
+
+input[type="range"] {
+  accent-color: #8b5cf6;
+}
+input[type="checkbox"] {
+  accent-color: #8b5cf6;
+}
+
+/* impede seleção de texto durante drag no canvas */
+.cg-dragging,
+.cg-dragging * {
+  user-select: none !important;
+  cursor: grabbing !important;
+}

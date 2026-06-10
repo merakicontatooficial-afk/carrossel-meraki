@@ -1,0 +1,336 @@
+import type { ColorToken, Element, Slide } from "../../types";
+import { uid, CANVAS_W, SAFE_MARGIN } from "../../types";
+import { checkText } from "../../config/guardrails";
+import { Btn, ColorInput, Field, FileButton, NumberInput, Section, Select, TextArea } from "../ui";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsDown,
+  ChevronsUp,
+  Copy,
+  ImagePlus,
+  Minus,
+  Square,
+  Trash2,
+  Type,
+} from "lucide-react";
+
+const TOKEN_OPTIONS = [
+  { value: "accent", label: "Acento (marca)" },
+  { value: "text", label: "Texto (marca)" },
+  { value: "bg", label: "Fundo (marca)" },
+  { value: "muted", label: "Suave (marca)" },
+  { value: "surface", label: "Superfície (marca)" },
+  { value: "__custom", label: "Cor personalizada…" },
+];
+
+function TokenColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: ColorToken | undefined;
+  onChange: (v: ColorToken) => void;
+}) {
+  const isToken = ["accent", "text", "bg", "muted", "surface"].includes(value ?? "");
+  return (
+    <Field label={label}>
+      <Select
+        value={isToken ? (value as string) : "__custom"}
+        onChange={(v) => onChange(v === "__custom" ? "#ffffff" : v)}
+        options={TOKEN_OPTIONS}
+      />
+      {!isToken && (
+        <div className="mt-2">
+          <ColorInput value={value ?? "#ffffff"} onChange={onChange} />
+        </div>
+      )}
+    </Field>
+  );
+}
+
+interface Props {
+  slide: Slide;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onPatchElement: (elId: string, patch: Partial<Element>) => void;
+  onReplaceElements: (elements: Element[]) => void;
+}
+
+/** Modo Manual: autonomia total sobre o elemento selecionado. Guardrails viram avisos. */
+export default function ManualInspector({ slide, selectedId, onSelect, onPatchElement, onReplaceElements }: Props) {
+  const el = slide.elements.find((e) => e.id === selectedId) ?? null;
+  const sorted = [...slide.elements].sort((a, b) => b.z - a.z);
+
+  const addElement = (partial: Partial<Element> & Pick<Element, "type">) => {
+    const maxZ = Math.max(0, ...slide.elements.map((e) => e.z));
+    const nu: Element = {
+      id: uid(),
+      x: SAFE_MARGIN,
+      y: 500,
+      w: CANVAS_W - 2 * SAFE_MARGIN,
+      h: 120,
+      z: maxZ + 1,
+      ...partial,
+    };
+    onReplaceElements([...slide.elements, nu]);
+    onSelect(nu.id);
+  };
+
+  const remove = () => {
+    if (!el) return;
+    onReplaceElements(slide.elements.filter((e) => e.id !== el.id));
+    onSelect(null);
+  };
+
+  const duplicate = () => {
+    if (!el) return;
+    const maxZ = Math.max(0, ...slide.elements.map((e) => e.z));
+    const copy: Element = { ...el, id: uid(), x: el.x + 40, y: el.y + 40, z: maxZ + 1 };
+    onReplaceElements([...slide.elements, copy]);
+    onSelect(copy.id);
+  };
+
+  const moveZ = (dir: "up" | "down" | "front" | "back") => {
+    if (!el) return;
+    const zs = slide.elements.map((e) => e.z);
+    if (dir === "front") onPatchElement(el.id, { z: Math.max(...zs) + 1 });
+    else if (dir === "back") onPatchElement(el.id, { z: Math.min(...zs) - 1 });
+    else {
+      const others = slide.elements.filter((e) => e.id !== el.id);
+      const next =
+        dir === "up"
+          ? others.filter((e) => e.z > el.z).sort((a, b) => a.z - b.z)[0]
+          : others.filter((e) => e.z < el.z).sort((a, b) => b.z - a.z)[0];
+      if (next) {
+        onPatchElement(el.id, { z: next.z });
+        onPatchElement(next.id, { z: el.z });
+      }
+    }
+  };
+
+  const textCheck = el?.type === "text" ? checkText(el.role, el.text ?? "") : null;
+
+  return (
+    <>
+      <Section
+        title="Elementos"
+        right={
+          <div className="flex gap-1">
+            <Btn title="Adicionar texto" onClick={() => addElement({ type: "text", text: "Novo texto", fontRole: "body", fontSize: 44, color: "text", lineHeight: 1.3 })}>
+              <Type size={13} />
+            </Btn>
+            <Btn title="Adicionar imagem" onClick={() => addElement({ type: "image", fit: "cover", radius: 24, shadow: true, h: 400 })}>
+              <ImagePlus size={13} />
+            </Btn>
+            <Btn title="Adicionar retângulo" onClick={() => addElement({ type: "shape", shape: "rect", fill: "accent", h: 200, w: 300 })}>
+              <Square size={13} />
+            </Btn>
+            <Btn title="Adicionar linha" onClick={() => addElement({ type: "shape", shape: "line", fill: "accent", h: 10, w: 200 })}>
+              <Minus size={13} />
+            </Btn>
+          </div>
+        }
+      >
+        <ul className="space-y-1">
+          {sorted.map((e) => (
+            <li key={e.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(e.id === selectedId ? null : e.id)}
+                className={`w-full truncate rounded-md px-2 py-1 text-left text-xs ${
+                  e.id === selectedId ? "bg-cyan-500/20 text-cyan-200" : "text-zinc-400 hover:bg-white/5"
+                }`}
+              >
+                {e.type === "text"
+                  ? `📝 ${(e.role ?? "texto").toUpperCase()} · ${(e.text ?? "").slice(0, 28) || "(vazio)"}`
+                  : e.type === "image"
+                    ? `🖼️ imagem${e.src ? "" : " (vazia)"}`
+                    : `▪️ ${e.shape === "line" ? "linha" : "retângulo"}`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      {!el && (
+        <Section title="Inspetor">
+          <p className="text-xs leading-relaxed text-zinc-500">
+            Clique num elemento na prévia (ou na lista acima) para editar tamanho, fonte, cor, posição e camada.
+            Arraste para mover; use os cantos para redimensionar.
+          </p>
+        </Section>
+      )}
+
+      {el && (
+        <Section
+          title={`Inspetor — ${el.type === "text" ? "texto" : el.type === "image" ? "imagem" : "forma"}`}
+          right={
+            <div className="flex gap-1">
+              <Btn title="Duplicar" onClick={duplicate}>
+                <Copy size={13} />
+              </Btn>
+              <Btn title="Excluir" variant="danger" onClick={remove}>
+                <Trash2 size={13} />
+              </Btn>
+            </div>
+          }
+        >
+          {el.type === "text" && (
+            <>
+              <Field
+                label="Texto"
+                hint={
+                  textCheck?.limit != null && (
+                    <span className={textCheck.over ? "font-semibold text-amber-400" : "text-zinc-500"}>
+                      {textCheck.count}/{textCheck.limit} {textCheck.over && "· acima do guia"}
+                    </span>
+                  )
+                }
+              >
+                <TextArea value={el.text ?? ""} onChange={(e) => onPatchElement(el.id, { text: e.target.value })} />
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Fonte">
+                  <Select
+                    value={el.fontRole ?? "body"}
+                    onChange={(v) => onPatchElement(el.id, { fontRole: v as Element["fontRole"] })}
+                    options={[
+                      { value: "display", label: "Display" },
+                      { value: "body", label: "Corpo" },
+                      { value: "label", label: "Label/Mono" },
+                    ]}
+                  />
+                </Field>
+                <Field label="Alinhamento">
+                  <Select
+                    value={el.align ?? "left"}
+                    onChange={(v) => onPatchElement(el.id, { align: v as Element["align"] })}
+                    options={[
+                      { value: "left", label: "Esquerda" },
+                      { value: "center", label: "Centro" },
+                      { value: "right", label: "Direita" },
+                    ]}
+                  />
+                </Field>
+                <Field label="Tamanho (px)">
+                  <NumberInput value={el.fontSize ?? 40} min={12} max={300} onChange={(v) => onPatchElement(el.id, { fontSize: v })} />
+                </Field>
+                <Field label="Peso">
+                  <Select
+                    value={String(el.fontWeight ?? 400)}
+                    onChange={(v) => onPatchElement(el.id, { fontWeight: Number(v) })}
+                    options={["400", "500", "600", "700", "800"].map((w) => ({ value: w, label: w }))}
+                  />
+                </Field>
+                <Field label="Entrelinha">
+                  <NumberInput value={el.lineHeight ?? 1.25} min={0.8} max={3} step={0.05} onChange={(v) => onPatchElement(el.id, { lineHeight: v })} />
+                </Field>
+                <Field label="Espaçamento (px)">
+                  <NumberInput value={el.letterSpacing ?? 0} min={-5} max={30} step={0.5} onChange={(v) => onPatchElement(el.id, { letterSpacing: v })} />
+                </Field>
+              </div>
+              <TokenColorField label="Cor" value={el.color} onChange={(color) => onPatchElement(el.id, { color })} />
+              {(el.fontSize ?? 40) < 40 && el.role === "body" && (
+                <p className="mb-2 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300">
+                  ⚠ Corpo abaixo de 40px fica difícil de ler no celular.
+                </p>
+              )}
+            </>
+          )}
+
+          {el.type === "image" && (
+            <>
+              <div className="mb-3 flex items-center gap-2">
+                <FileButton label={el.src ? "Trocar imagem" : "Subir imagem"} onFile={(src) => onPatchElement(el.id, { src })} />
+                {el.src && (
+                  <Btn variant="danger" onClick={() => onPatchElement(el.id, { src: undefined })}>
+                    <Trash2 size={13} />
+                  </Btn>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Ajuste">
+                  <Select
+                    value={el.fit ?? "cover"}
+                    onChange={(v) => onPatchElement(el.id, { fit: v as Element["fit"] })}
+                    options={[
+                      { value: "cover", label: "Cover (preenche)" },
+                      { value: "contain", label: "Contain (inteira)" },
+                    ]}
+                  />
+                </Field>
+                <Field label="Raio de canto">
+                  <NumberInput value={el.radius ?? 0} min={0} max={200} onChange={(v) => onPatchElement(el.id, { radius: v })} />
+                </Field>
+              </div>
+              <label className="mb-3 flex items-center gap-2 text-xs text-zinc-300">
+                <input type="checkbox" checked={el.shadow ?? false} onChange={(e) => onPatchElement(el.id, { shadow: e.target.checked })} />
+                Sombra
+              </label>
+            </>
+          )}
+
+          {el.type === "shape" && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Tipo">
+                  <Select
+                    value={el.shape ?? "rect"}
+                    onChange={(v) => onPatchElement(el.id, { shape: v as Element["shape"] })}
+                    options={[
+                      { value: "rect", label: "Retângulo" },
+                      { value: "line", label: "Linha" },
+                    ]}
+                  />
+                </Field>
+                <Field label="Raio">
+                  <NumberInput value={el.radius2 ?? 0} min={0} max={200} onChange={(v) => onPatchElement(el.id, { radius2: v })} />
+                </Field>
+              </div>
+              <TokenColorField label="Preenchimento" value={el.fill} onChange={(fill) => onPatchElement(el.id, { fill })} />
+            </>
+          )}
+
+          <div className="grid grid-cols-4 gap-2">
+            <Field label="X">
+              <NumberInput value={el.x} onChange={(v) => onPatchElement(el.id, { x: v })} />
+            </Field>
+            <Field label="Y">
+              <NumberInput value={el.y} onChange={(v) => onPatchElement(el.id, { y: v })} />
+            </Field>
+            <Field label="L">
+              <NumberInput value={el.w} min={20} onChange={(v) => onPatchElement(el.id, { w: v })} />
+            </Field>
+            <Field label="A">
+              <NumberInput value={el.h} min={20} onChange={(v) => onPatchElement(el.id, { h: v })} />
+            </Field>
+          </div>
+
+          <Field label="Camada">
+            <div className="flex gap-1">
+              <Btn title="Trazer pra frente" onClick={() => moveZ("front")}>
+                <ChevronsUp size={13} />
+              </Btn>
+              <Btn title="Subir" onClick={() => moveZ("up")}>
+                <ArrowUp size={13} />
+              </Btn>
+              <Btn title="Descer" onClick={() => moveZ("down")}>
+                <ArrowDown size={13} />
+              </Btn>
+              <Btn title="Mandar pro fundo" onClick={() => moveZ("back")}>
+                <ChevronsDown size={13} />
+              </Btn>
+              <span className="ml-2 self-center text-xs text-zinc-500">z = {el.z}</span>
+            </div>
+          </Field>
+
+          <Field label="Rotação (graus)">
+            <NumberInput value={el.rotation ?? 0} min={-180} max={180} onChange={(v) => onPatchElement(el.id, { rotation: v })} />
+          </Field>
+        </Section>
+      )}
+    </>
+  );
+}

@@ -1,0 +1,103 @@
+import type { BrandKit } from "../types";
+
+// Brand kits iniciais (refináveis). Cores entram como tokens nos elementos;
+// trocar de kit recolore tudo que usa "accent" / "text" / "bg".
+export const KITS: BrandKit[] = [
+  {
+    id: "editorial",
+    name: "Editorial (referência)",
+    locked: true,
+    bg: "#100B0A",
+    surface: "#1C1412",
+    text: "#F7EFEA",
+    muted: "#B5A8A2",
+    accent: "#E8A39C",
+    glow: "#EA580C",
+    fontDisplay: "Fraunces",
+    fontBody: "DM Sans",
+    fontLabel: "Space Mono",
+    logo: "@suamarca",
+    motif: "glow",
+    eyebrow: "pill-index",
+    note: "Kit da referência viral: display serifado + brilho quente.",
+  },
+  {
+    id: "padrao",
+    name: "Padrão",
+    locked: false,
+    bg: "#16161a",
+    surface: "#1F1F26",
+    text: "#F2F2F5",
+    muted: "#9C9CA8",
+    accent: "#5B8DEF",
+    glow: null,
+    fontDisplay: "Inter",
+    fontBody: "Inter",
+    fontLabel: "Inter",
+    logo: "SUA MARCA",
+    motif: "minimal",
+    eyebrow: "minimal",
+    note: "Kit neutro e destravado — base para personalizar.",
+  },
+  {
+    id: "g2d-gestao",
+    name: "G2D Gestão",
+    locked: true,
+    bg: "#0E0E10",
+    surface: "#18181C",
+    text: "#F4F1E8",
+    muted: "#A8A496",
+    accent: "#C9A84C",
+    glow: "#C9A84C",
+    fontDisplay: "Syne",
+    fontBody: "DM Sans",
+    fontLabel: "Space Mono",
+    logo: "G2D",
+    sub: "GESTÃO",
+    motif: "glow",
+    eyebrow: "pill-index",
+  },
+  {
+    id: "g2d-licenciamentos",
+    name: "G2D Licenciamentos",
+    locked: true,
+    bg: "#100D08",
+    surface: "#1B160E",
+    text: "#F4EFE4",
+    muted: "#A99F8C",
+    accent: "#C9A84C",
+    glow: "#9a6b1f",
+    fontDisplay: "Syne",
+    fontBody: "DM Sans",
+    fontLabel: "Space Mono",
+    logo: "G2D",
+    sub: "LICENCIAMENTOS",
+    motif: "glow",
+    eyebrow: "badge",
+  },
+  {
+    id: "meraki",
+    name: "Meraki",
+    locked: true,
+    bg: "#141019",
+    surface: "#1E1726",
+    text: "#F3F0F8",
+    muted: "#A89DBA",
+    accent: "#8B5CF6",
+    glow: "#8B5CF6",
+    fontDisplay: "Poppins",
+    fontBody: "Poppins",
+    fontLabel: "Space Mono",
+    logo: "meraki",
+    motif: "glow",
+    eyebrow: "pill-index",
+  },
+];
+
+export function getKit(id: string, customKits: BrandKit[] = []): BrandKit {
+  return (
+    customKits.find((k) => k.id === id) ??
+    KITS.find((k) => k.id === id) ??
+    KITS[1]
+  );
+}
