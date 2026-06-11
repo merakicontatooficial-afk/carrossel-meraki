@@ -1,8 +1,47 @@
 import type { BrandKit } from "../types";
 
-// Brand kits iniciais (refináveis). Cores entram como tokens nos elementos;
-// trocar de kit recolore tudo que usa "accent" / "text" / "bg".
+// Brand kits. Os dois "Livre" replicam a linhagem visual dos carrosséis virais
+// do MyPostFlow (referências em refs/): nascem destravados — liberdade total.
+// Cores entram como tokens nos elementos; trocar de kit recolore tudo.
 export const KITS: BrandKit[] = [
+  {
+    id: "livre-escuro",
+    name: "Livre · Escuro",
+    locked: false,
+    bg: "#0A0A0B",
+    surface: "#17171A",
+    text: "#FFFFFF",
+    muted: "#9A9AA2",
+    accent: "#FFD60A",
+    accent2: null,
+    glow: null,
+    fontDisplay: "Archivo Black",
+    fontBody: "Inter",
+    fontLabel: "Inter",
+    logo: "@suamarca",
+    motif: "minimal",
+    eyebrow: "handle",
+    note: "Preto + amarelo, headline condensada em caixa alta, realce ==assim==. Estilo viral dark.",
+  },
+  {
+    id: "livre-claro",
+    name: "Livre · Claro",
+    locked: false,
+    bg: "#FFFFFF",
+    surface: "#F4F4F5",
+    text: "#0E0E10",
+    muted: "#62626B",
+    accent: "#FF3B1F",
+    accent2: null,
+    glow: null,
+    fontDisplay: "Inter",
+    fontBody: "Inter",
+    fontLabel: "Inter",
+    logo: "@suamarca",
+    motif: "minimal",
+    eyebrow: "handle",
+    note: "Branco editorial: headline preta com acento vermelho-laranja, ~cinza~ pra de-ênfase.",
+  },
   {
     id: "editorial",
     name: "Editorial (referência)",
@@ -12,6 +51,7 @@ export const KITS: BrandKit[] = [
     text: "#F7EFEA",
     muted: "#B5A8A2",
     accent: "#E8A39C",
+    accent2: null,
     glow: "#EA580C",
     fontDisplay: "Fraunces",
     fontBody: "DM Sans",
@@ -19,25 +59,7 @@ export const KITS: BrandKit[] = [
     logo: "@suamarca",
     motif: "glow",
     eyebrow: "pill-index",
-    note: "Kit da referência viral: display serifado + brilho quente.",
-  },
-  {
-    id: "padrao",
-    name: "Padrão",
-    locked: false,
-    bg: "#16161a",
-    surface: "#1F1F26",
-    text: "#F2F2F5",
-    muted: "#9C9CA8",
-    accent: "#5B8DEF",
-    glow: null,
-    fontDisplay: "Inter",
-    fontBody: "Inter",
-    fontLabel: "Inter",
-    logo: "SUA MARCA",
-    motif: "minimal",
-    eyebrow: "minimal",
-    note: "Kit neutro e destravado — base para personalizar.",
+    note: "Kit serifado com brilho quente.",
   },
   {
     id: "g2d-gestao",
@@ -48,6 +70,7 @@ export const KITS: BrandKit[] = [
     text: "#F4F1E8",
     muted: "#A8A496",
     accent: "#C9A84C",
+    accent2: null,
     glow: "#C9A84C",
     fontDisplay: "Syne",
     fontBody: "DM Sans",
@@ -66,6 +89,7 @@ export const KITS: BrandKit[] = [
     text: "#F4EFE4",
     muted: "#A99F8C",
     accent: "#C9A84C",
+    accent2: null,
     glow: "#9a6b1f",
     fontDisplay: "Syne",
     fontBody: "DM Sans",
@@ -84,6 +108,7 @@ export const KITS: BrandKit[] = [
     text: "#F3F0F8",
     muted: "#A89DBA",
     accent: "#8B5CF6",
+    accent2: null,
     glow: "#8B5CF6",
     fontDisplay: "Poppins",
     fontBody: "Poppins",
@@ -98,6 +123,6 @@ export function getKit(id: string, customKits: BrandKit[] = []): BrandKit {
   return (
     customKits.find((k) => k.id === id) ??
     KITS.find((k) => k.id === id) ??
-    KITS[1]
+    KITS[0]
   );
 }

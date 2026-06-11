@@ -2,6 +2,7 @@ import type { BrandKit, ColorToken, FontRole, Slide } from "../types";
 
 // Stacks CSS reais das fontes empacotadas via @fontsource
 const FONT_STACKS: Record<string, string> = {
+  "Archivo Black": '"Archivo Black", "Inter", system-ui, sans-serif',
   Fraunces: '"Fraunces", Georgia, serif',
   Syne: '"Syne", system-ui, sans-serif',
   "DM Sans": '"DM Sans", system-ui, sans-serif',

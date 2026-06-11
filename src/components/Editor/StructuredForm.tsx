@@ -1,5 +1,5 @@
 import type { Element, Slide, TextRole } from "../../types";
-import { checkText, countWords } from "../../config/guardrails";
+import { checkText } from "../../config/guardrails";
 import { Field, FileButton, Section, TextArea, Btn } from "../ui";
 import { ImagePlus, Trash2 } from "lucide-react";
 
@@ -50,23 +50,21 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
               <TextArea
                 value={el.text ?? ""}
                 className={check.over ? "border-amber-500/60" : ""}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  // trava no modo estruturado: não deixa AUMENTAR além do limite
-                  if (check.limit !== null) {
-                    const nextCount = countWords(next);
-                    if (nextCount > check.limit && nextCount > check.count) return;
-                  }
-                  onPatchElement(el.id, { text: next });
-                }}
+                onChange={(e) => onPatchElement(el.id, { text: e.target.value })}
               />
+              {check.over && (
+                <p className="-mt-2 mb-2 text-[11px] text-amber-400/90">
+                  Acima do guia viral — ok se for proposital, mas frases curtas prendem mais.
+                </p>
+              )}
             </Field>
           );
         })}
         <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
           Marcação: <code className="text-zinc-300">*acento*</code> ·{" "}
+          <code className="text-zinc-300">==realce==</code> ·{" "}
           <code className="text-zinc-300">_sublinhado_</code> ·{" "}
-          <code className="text-zinc-300">==realce==</code>
+          <code className="text-zinc-300">~suave~</code>
         </p>
       </Section>
 
@@ -99,8 +97,8 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
         <div className="flex items-center gap-2">
           {slide.bgImage && <img src={slide.bgImage} alt="" className="h-10 w-14 rounded object-cover" />}
           <FileButton
-            label={slide.bgImage ? "Trocar fundo" : "Imagem de fundo"}
-            onFile={(bgImage) => onPatchSlide({ bgImage })}
+            label={slide.bgImage ? "Trocar foto" : "Foto de fundo"}
+            onFile={(bgImage) => onPatchSlide({ bgImage, scrim: slide.scrim ?? 65 })}
           />
           {slide.bgImage && (
             <Btn variant="danger" onClick={() => onPatchSlide({ bgImage: undefined })} title="Remover fundo">
@@ -108,6 +106,23 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
             </Btn>
           )}
         </div>
+        {slide.bgImage && (
+          <Field label={`Escurecer p/ legibilidade — ${slide.scrim ?? 65}%`}>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={slide.scrim ?? 65}
+              onChange={(e) => onPatchSlide({ scrim: Number(e.target.value) })}
+              className="w-full"
+            />
+          </Field>
+        )}
+        {!slide.bgImage && (
+          <p className="mt-2 text-[11px] text-zinc-500">
+            Suba uma foto cinematográfica pra um slide no estilo viral (texto sobre a imagem).
+          </p>
+        )}
       </Section>
     </>
   );

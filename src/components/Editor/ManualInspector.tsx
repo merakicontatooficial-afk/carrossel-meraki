@@ -231,6 +231,14 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                   <NumberInput value={el.letterSpacing ?? 0} min={-5} max={30} step={0.5} onChange={(v) => onPatchElement(el.id, { letterSpacing: v })} />
                 </Field>
               </div>
+              <label className="mb-3 flex items-center gap-2 text-xs text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={el.uppercase ?? false}
+                  onChange={(e) => onPatchElement(el.id, { uppercase: e.target.checked })}
+                />
+                CAIXA ALTA
+              </label>
               <TokenColorField label="Cor" value={el.color} onChange={(color) => onPatchElement(el.id, { color })} />
               {(el.fontSize ?? 40) < 40 && el.role === "body" && (
                 <p className="mb-2 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300">

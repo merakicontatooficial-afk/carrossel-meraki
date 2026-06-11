@@ -101,6 +101,9 @@ export default function IdentityPanel({ kit, onUpdateKit, onCreateKit }: Props) 
               <ColorInput value={kit.muted} onChange={(muted) => onUpdateKit({ ...kit, muted })} />
             </Field>
           </div>
+          <Field label="Acento 2 — gradiente no *destaque* (vazio = cor sólida)">
+            <ColorInput value={kit.accent2 ?? ""} onChange={(v) => onUpdateKit({ ...kit, accent2: v || null })} />
+          </Field>
           <Field label="Brilho (vazio = sem brilho)">
             <ColorInput value={kit.glow ?? ""} onChange={(glow) => onUpdateKit({ ...kit, glow: glow || null, motif: glow ? "glow" : "minimal" })} />
           </Field>
@@ -119,6 +122,7 @@ export default function IdentityPanel({ kit, onUpdateKit, onCreateKit }: Props) 
                 value={kit.eyebrow}
                 onChange={(v) => onUpdateKit({ ...kit, eyebrow: v as BrandKit["eyebrow"] })}
                 options={[
+                  { value: "handle", label: "Pílula @handle (viral)" },
                   { value: "pill-index", label: "Pílula com índice" },
                   { value: "badge", label: "Badge preenchido" },
                   { value: "minimal", label: "Minimal" },

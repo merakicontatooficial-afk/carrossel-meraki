@@ -76,6 +76,16 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
           draggable={false}
         />
       )}
+      {slide.bgImage && (slide.scrim ?? 0) > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `linear-gradient(180deg, rgba(0,0,0,${((slide.scrim ?? 0) / 100) * 0.45}) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 48%, rgba(0,0,0,${(slide.scrim ?? 0) / 100}) 90%)`,
+            pointerEvents: "none",
+          }}
+        />
+      )}
       {glowLayer && (
         <div style={{ position: "absolute", inset: 0, backgroundImage: glowLayer, pointerEvents: "none" }} />
       )}
@@ -367,11 +377,13 @@ function ElementContent({
     lineHeight: el.lineHeight ?? 1.25,
     letterSpacing: el.letterSpacing != null ? `${el.letterSpacing}px` : undefined,
     textAlign: el.align ?? "left",
+    textTransform: el.uppercase ? "uppercase" : undefined,
     color,
     whiteSpace: "pre-wrap",
     overflowWrap: "break-word",
   };
-  const rich = renderRich(el.text ?? "", { accent: pal.accent, bg: pal.bg });
+  const richOpts = { accent: pal.accent, accent2: kit.accent2, bg: pal.bg, muted: pal.muted };
+  const rich = renderRich(el.text ?? "", richOpts);
 
   if (el.role === "eyebrow") {
     const idx = String(slideIndex + 1).padStart(2, "0");
@@ -388,7 +400,36 @@ function ElementContent({
     };
     return (
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "flex-start", justifyContent: justify }}>
-        {kit.eyebrow === "pill-index" ? (
+        {kit.eyebrow === "handle" ? (
+          <span
+            style={{
+              ...inner,
+              textTransform: "none",
+              letterSpacing: "0.2px",
+              fontWeight: 600,
+              fontSize: (el.fontSize ?? 30) * 0.95,
+              color: pal.text,
+              backgroundColor: `${pal.text}12`,
+              border: `1.5px solid ${pal.text}1f`,
+              borderRadius: 999,
+              padding: "0.5em 1.1em",
+              gap: "0.55em",
+            }}
+          >
+            <span
+              style={{
+                width: "0.95em",
+                height: "0.95em",
+                borderRadius: 999,
+                background: kit.accent2
+                  ? `linear-gradient(135deg, ${pal.accent}, ${kit.accent2})`
+                  : pal.accent,
+                flexShrink: 0,
+              }}
+            />
+            {el.text || kit.logo}
+          </span>
+        ) : kit.eyebrow === "pill-index" ? (
           <span
             style={{
               ...inner,
@@ -398,7 +439,7 @@ function ElementContent({
               padding: "0.45em 1.1em",
             }}
           >
-            {idx}&nbsp;—&nbsp;{renderRich(el.text ?? "", { accent: pal.accent, bg: pal.bg })}
+            {idx}&nbsp;—&nbsp;{renderRich(el.text ?? "", { accent: pal.accent, bg: pal.bg, muted: pal.muted })}
           </span>
         ) : kit.eyebrow === "badge" ? (
           <span
@@ -410,7 +451,7 @@ function ElementContent({
               padding: "0.45em 1em",
             }}
           >
-            {renderRich(el.text ?? "", { accent: pal.bg, bg: pal.accent })}
+            {renderRich(el.text ?? "", { accent: pal.bg, bg: pal.accent, muted: pal.muted })}
           </span>
         ) : (
           <span style={{ ...inner, color: resolveColor(el.color ?? "accent", slide, kit, pal.accent) }}>
@@ -435,7 +476,7 @@ function ElementContent({
           lineHeight: 1.1,
         }}
       >
-        <span>{renderRich(el.text ?? "", { accent: pal.bg, bg: pal.accent })}</span>
+        <span>{renderRich(el.text ?? "", { accent: pal.bg, bg: pal.accent, muted: pal.bg })}</span>
       </div>
     );
   }

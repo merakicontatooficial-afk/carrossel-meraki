@@ -4,6 +4,8 @@ import App from "./App";
 import "./index.css";
 
 // Fontes offline (@fontsource) — sem chamada externa em runtime
+import "@fontsource/archivo-black/400.css";
+import "@fontsource/inter/800.css";
 import "@fontsource/fraunces/400.css";
 import "@fontsource/fraunces/600.css";
 import "@fontsource/fraunces/700.css";

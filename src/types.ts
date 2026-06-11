@@ -38,6 +38,7 @@ export interface Element {
   lineHeight?: number;
   letterSpacing?: number;
   align?: "left" | "center" | "right";
+  uppercase?: boolean;
   color?: ColorToken;
   // image
   src?: string;
@@ -65,6 +66,7 @@ export interface Slide {
   elements: Element[];
   bg?: ColorToken; // token = herda marca
   bgImage?: string; // dataURL opcional
+  scrim?: number; // 0–100: gradiente escuro de baixo pra cima sobre o fundo (estilo viral)
   colors: SlideColors;
 }
 
@@ -77,6 +79,7 @@ export interface BrandKit {
   text: string;
   muted: string;
   accent: string;
+  accent2?: string | null; // se definido, *destaque* vira gradiente accent→accent2
   glow?: string | null;
   fontDisplay: string;
   fontBody: string;
@@ -84,7 +87,7 @@ export interface BrandKit {
   logo: string;
   sub?: string;
   motif: "glow" | "badge" | "minimal";
-  eyebrow: "pill-index" | "badge" | "minimal";
+  eyebrow: "pill-index" | "badge" | "minimal" | "handle";
   graphicAssets?: string[];
   note?: string;
 }

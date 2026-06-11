@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/archivo-black": "^5.2.8",
     "@fontsource/dm-sans": "^5.2.5",
     "@fontsource/fraunces": "^5.2.5",
     "@fontsource/inter": "^5.2.5",
