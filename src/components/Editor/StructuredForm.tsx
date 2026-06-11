@@ -152,16 +152,60 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
           )}
         </div>
         {slide.bgImage && (
-          <Field label={`Escurecer p/ legibilidade — ${slide.scrim ?? 65}%`}>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={slide.scrim ?? 65}
-              onChange={(e) => onPatchSlide({ scrim: Number(e.target.value) })}
-              className="w-full"
-            />
-          </Field>
+          <>
+            <Field label={`Zoom da foto — ${Math.round((slide.bgScale ?? 1) * 100)}%`}>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.02}
+                value={slide.bgScale ?? 1}
+                onChange={(e) => onPatchSlide({ bgScale: Number(e.target.value) })}
+                className="w-full"
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label={`Mover ⇆ — ${slide.bgPosX ?? 0}`}>
+                <input
+                  type="range"
+                  min={-50}
+                  max={50}
+                  value={slide.bgPosX ?? 0}
+                  onChange={(e) => onPatchSlide({ bgPosX: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </Field>
+              <Field label={`Mover ⇅ — ${slide.bgPosY ?? 0}`}>
+                <input
+                  type="range"
+                  min={-50}
+                  max={50}
+                  value={slide.bgPosY ?? 0}
+                  onChange={(e) => onPatchSlide({ bgPosY: Number(e.target.value) })}
+                  className="w-full"
+                />
+              </Field>
+            </div>
+            {(slide.bgScale ?? 1) !== 1 || (slide.bgPosX ?? 0) !== 0 || (slide.bgPosY ?? 0) !== 0 ? (
+              <button
+                type="button"
+                onClick={() => onPatchSlide({ bgScale: 1, bgPosX: 0, bgPosY: 0 })}
+                className="mb-2 text-[11px] text-violet-300 hover:underline"
+              >
+                Resetar enquadramento
+              </button>
+            ) : null}
+            <Field label={`Escurecer p/ legibilidade — ${slide.scrim ?? 65}%`}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={slide.scrim ?? 65}
+                onChange={(e) => onPatchSlide({ scrim: Number(e.target.value) })}
+                className="w-full"
+              />
+            </Field>
+          </>
         )}
         {!slide.bgImage && (
           <p className="mt-2 text-[11px] text-zinc-500">

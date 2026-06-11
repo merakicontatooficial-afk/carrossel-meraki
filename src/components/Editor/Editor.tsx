@@ -4,15 +4,16 @@ import { STRUCTURES, getStructure } from "../../config/structures";
 import { effectiveColors } from "../../lib/resolve";
 import { cloneSlides } from "../../lib/clone";
 import { exportCarousel } from "../../lib/export";
-import { Btn, ColorInput, Field, Section, Select } from "../ui";
+import { Btn, ColorInput, Field, NumberInput, Section, Select } from "../ui";
 import IdentityPanel from "./IdentityPanel";
 import LogoUploader from "./LogoUploader";
 import FramePanel from "./FramePanel";
+import CounterPanel from "./CounterPanel";
 import StructuredForm from "./StructuredForm";
 import ManualInspector from "./ManualInspector";
 import Preview from "./Preview";
 import Filmstrip from "./Filmstrip";
-import { ArrowLeft, Bookmark, Download, Lock, Pencil, Unlock, Wand2 } from "lucide-react";
+import { ArrowLeft, Bookmark, Download, Lock, Move, Pencil, RotateCcw, Unlock, Wand2 } from "lucide-react";
 
 interface Props {
   carousel: Carousel;
@@ -158,7 +159,76 @@ export default function Editor({
 
           <LogoUploader logo={carousel.logo} onChange={(logo) => onChange({ ...carousel, logo })} />
 
+          {carousel.logo.src && (
+            <Section
+              title={`Logo no slide ${safeIndex + 1}`}
+              right={
+                slide.logoOverride ? (
+                  <button
+                    type="button"
+                    title="Voltar à posição padrão"
+                    onClick={() => patchSlide(safeIndex, { logoOverride: undefined })}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-violet-300 hover:bg-white/10"
+                  >
+                    <RotateCcw size={11} /> padrão
+                  </button>
+                ) : undefined
+              }
+            >
+              {slide.logoOverride ? (
+                <>
+                  <p className="mb-2 text-[11px] text-zinc-500">
+                    Posição própria neste slide. Arraste o logo na prévia (modo manual) ou ajuste abaixo.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="X">
+                      <NumberInput value={slide.logoOverride.x} onChange={(x) => patchSlide(safeIndex, { logoOverride: { ...slide.logoOverride!, x } })} />
+                    </Field>
+                    <Field label="Y">
+                      <NumberInput value={slide.logoOverride.y} onChange={(y) => patchSlide(safeIndex, { logoOverride: { ...slide.logoOverride!, y } })} />
+                    </Field>
+                  </div>
+                  <Field label={`Tamanho — ${Math.round((slide.logoOverride.scale ?? carousel.logo.scale ?? 1) * 100)}%`}>
+                    <input
+                      type="range"
+                      min={0.4}
+                      max={2.5}
+                      step={0.05}
+                      value={slide.logoOverride.scale ?? carousel.logo.scale ?? 1}
+                      onChange={(e) => patchSlide(safeIndex, { logoOverride: { ...slide.logoOverride!, scale: Number(e.target.value) } })}
+                      className="w-full"
+                    />
+                  </Field>
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={slide.logoOverride.show !== false}
+                      onChange={(e) => patchSlide(safeIndex, { logoOverride: { ...slide.logoOverride!, show: e.target.checked } })}
+                    />
+                    Mostrar neste slide
+                  </label>
+                </>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-zinc-500">Herdando a posição padrão.</p>
+                  <Btn
+                    onClick={() =>
+                      patchSlide(safeIndex, {
+                        logoOverride: { x: 80, y: 80, scale: carousel.logo.scale ?? 1, show: true },
+                      })
+                    }
+                    title="Dar posição própria a este slide"
+                  >
+                    <Move size={12} /> Posição própria
+                  </Btn>
+                </div>
+              )}
+            </Section>
+          )}
+
           <FramePanel frame={carousel.frame} onChange={(frame) => onChange({ ...carousel, frame })} />
+
+          <CounterPanel counter={carousel.counter} onChange={(counter) => onChange({ ...carousel, counter })} />
 
           <Section
             title={`Cor do slide ${safeIndex + 1}`}
@@ -249,6 +319,11 @@ export default function Editor({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onPatchElement={patchElement}
+            onMoveLogo={(x, y) =>
+              patchSlide(safeIndex, {
+                logoOverride: { ...(slide.logoOverride ?? { show: true }), x, y },
+              })
+            }
           />
           <Filmstrip
             carousel={carousel}

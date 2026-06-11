@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { BrandKit, Carousel, CarouselLogo, Element, Slide } from "../types";
+import type { BrandKit, Carousel, CarouselCounter, CarouselLogo, Element, Slide, SlideLogoOverride } from "../types";
 import { CANVAS_H, CANVAS_W, SAFE_MARGIN } from "../types";
 import { effectiveColors, resolveColor, resolveFont } from "../lib/resolve";
 import { renderRich } from "../lib/richtext";
@@ -29,6 +29,7 @@ export interface InteractiveCtx {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onPatch: (id: string, patch: Partial<Element>) => void;
+  onMoveLogo?: (x: number, y: number) => void; // arrastar o logo cria override no slide
 }
 
 interface SlideCanvasProps {
@@ -66,10 +67,17 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
 
   const sorted = [...slide.elements].sort((a, b) => a.z - b.z);
 
+  const override = slide.logoOverride;
   const logoOnThisSlide =
     carousel.logo.everySlide === false ? slideIndex === 0 : true;
-  const manualLogo = carousel.logo.src && carousel.logo.show && logoOnThisSlide ? carousel.logo : null;
+  // override força exibição (salvo show:false); senão segue a regra padrão
+  const logoVisible =
+    !!carousel.logo.src &&
+    (override ? override.show !== false : carousel.logo.show && logoOnThisSlide);
   const frame = carousel.frame;
+  const counter = carousel.counter;
+  const showCounter =
+    counter && counter.style !== "none" && !(counter.hideOnCover && slideIndex === 0);
 
   return (
     <div
@@ -92,7 +100,15 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
         <img
           src={slide.bgImage}
           alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: `${50 + (slide.bgPosX ?? 0)}% ${50 + (slide.bgPosY ?? 0)}%`,
+            transform: slide.bgScale && slide.bgScale !== 1 ? `scale(${slide.bgScale})` : undefined,
+          }}
           draggable={false}
         />
       )}
@@ -110,24 +126,6 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
         <div style={{ position: "absolute", inset: 0, backgroundImage: glowLayer, pointerEvents: "none" }} />
       )}
 
-      {/* molduras PNG topo/base (mesma faixa em todos os slides) */}
-      {frame?.top && (
-        <img
-          src={frame.top}
-          alt=""
-          draggable={false}
-          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: frame.topH, objectFit: "cover", zIndex: 6, pointerEvents: "none" }}
-        />
-      )}
-      {frame?.bottom && (
-        <img
-          src={frame.bottom}
-          alt=""
-          draggable={false}
-          style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: frame.bottomH, objectFit: "cover", zIndex: 6, pointerEvents: "none" }}
-        />
-      )}
-
       {sorted.map((el) => (
         <ElementView
           key={el.id}
@@ -142,7 +140,54 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
         />
       ))}
 
-      {manualLogo && <ManualLogo logo={manualLogo} />}
+      {logoVisible && (
+        <LogoLayer logo={carousel.logo} override={override} interactive={interactive} />
+      )}
+
+      {showCounter && (
+        <CounterView
+          counter={counter!}
+          index={slideIndex}
+          total={carousel.slides.length}
+          color={counter!.accent ? pal.accent : pal.text}
+        />
+      )}
+
+      {/* molduras PNG sobrepostas POR CIMA de tudo (aspecto natural, não cortam) */}
+      {frame?.top && (
+        <img
+          src={frame.top}
+          alt=""
+          draggable={false}
+          style={{
+            position: "absolute",
+            top: frame.topOffset ?? 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: `${frame.topScale ?? 100}%`,
+            height: "auto",
+            zIndex: 400,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+      {frame?.bottom && (
+        <img
+          src={frame.bottom}
+          alt=""
+          draggable={false}
+          style={{
+            position: "absolute",
+            bottom: frame.bottomOffset ?? 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: `${frame.bottomScale ?? 100}%`,
+            height: "auto",
+            zIndex: 400,
+            pointerEvents: "none",
+          }}
+        />
+      )}
 
       {/* guias de snap durante drag */}
       {interactive && guides.v !== null && (
@@ -155,23 +200,174 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
   );
 }
 
-function ManualLogo({ logo }: { logo: CarouselLogo }) {
-  const pos: CSSProperties =
-    logo.position === "tl"
+function LogoLayer({
+  logo,
+  override,
+  interactive,
+}: {
+  logo: CarouselLogo;
+  override?: SlideLogoOverride;
+  interactive?: InteractiveCtx;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const scale = override?.scale ?? logo.scale ?? 1;
+  const canDrag = !!interactive?.onMoveLogo;
+
+  // posição: override (livre, left/top) ou canto padrão
+  const cornerPos: CSSProperties = override
+    ? { left: override.x, top: override.y }
+    : logo.position === "tl"
       ? { top: SAFE_MARGIN, left: SAFE_MARGIN }
       : logo.position === "tr"
         ? { top: SAFE_MARGIN, right: SAFE_MARGIN }
         : logo.position === "bl"
           ? { bottom: SAFE_MARGIN, left: SAFE_MARGIN }
           : { bottom: SAFE_MARGIN, right: SAFE_MARGIN };
-  const scale = logo.scale ?? 1;
+
+  const onDown = (e: React.PointerEvent) => {
+    if (!interactive?.onMoveLogo || !wrapRef.current) return;
+    e.stopPropagation();
+    // offsetLeft/Top são coords de layout (1080-base), imunes ao transform de escala
+    dragRef.current = { px: e.clientX, py: e.clientY, x: wrapRef.current.offsetLeft, y: wrapRef.current.offsetTop };
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    document.body.classList.add("cg-dragging");
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d || !interactive?.onMoveLogo) return;
+    const nx = Math.round(d.x + (e.clientX - d.px) / interactive.scale);
+    const ny = Math.round(d.y + (e.clientY - d.py) / interactive.scale);
+    interactive.onMoveLogo(nx, ny);
+  };
+  const onUp = () => {
+    dragRef.current = null;
+    document.body.classList.remove("cg-dragging");
+  };
+
   return (
-    <img
-      src={logo.src!}
-      alt="logo"
-      style={{ position: "absolute", maxWidth: 240 * scale, maxHeight: 110 * scale, objectFit: "contain", zIndex: 200, ...pos }}
-      draggable={false}
-    />
+    <div
+      ref={wrapRef}
+      onPointerDown={canDrag ? onDown : undefined}
+      onPointerMove={canDrag ? onMove : undefined}
+      onPointerUp={canDrag ? onUp : undefined}
+      style={{
+        position: "absolute",
+        zIndex: 200,
+        lineHeight: 0,
+        cursor: canDrag ? "grab" : undefined,
+        outline: canDrag ? "1px dashed rgba(34,211,238,0.4)" : undefined,
+        outlineOffset: 4,
+        ...cornerPos,
+      }}
+    >
+      <img
+        src={logo.src!}
+        alt="logo"
+        style={{ maxWidth: 240 * scale, maxHeight: 110 * scale, objectFit: "contain", display: "block" }}
+        draggable={false}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function CounterView({
+  counter,
+  index,
+  total,
+  color,
+}: {
+  counter: CarouselCounter;
+  index: number;
+  total: number;
+  color: string;
+}) {
+  const pos: CSSProperties =
+    counter.pos === "br"
+      ? { bottom: SAFE_MARGIN, right: SAFE_MARGIN, justifyContent: "flex-end" }
+      : counter.pos === "bl"
+        ? { bottom: SAFE_MARGIN, left: SAFE_MARGIN, justifyContent: "flex-start" }
+        : counter.pos === "tc"
+          ? { top: SAFE_MARGIN, left: 0, right: 0, justifyContent: "center" }
+          : counter.pos === "tr"
+            ? { top: SAFE_MARGIN, right: SAFE_MARGIN, justifyContent: "flex-end" }
+            : { bottom: SAFE_MARGIN, left: 0, right: 0, justifyContent: "center" };
+
+  const wrap: CSSProperties = {
+    position: "absolute",
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    zIndex: 250,
+    pointerEvents: "none",
+    ...pos,
+  };
+
+  if (counter.style === "fraction") {
+    return (
+      <div style={{ ...wrap, fontFamily: '"Space Mono", ui-monospace, monospace', fontSize: 34, fontWeight: 700, letterSpacing: 2 }}>
+        <span style={{ color }}>
+          {String(index + 1).padStart(2, "0")}
+          <span style={{ opacity: 0.45 }}> / {String(total).padStart(2, "0")}</span>
+        </span>
+      </div>
+    );
+  }
+
+  if (counter.style === "number") {
+    return (
+      <div style={{ ...wrap, alignItems: "baseline", gap: 8 }}>
+        <span style={{ color, fontFamily: '"Archivo Black", system-ui, sans-serif', fontSize: 72, lineHeight: 1 }}>
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <span style={{ color, opacity: 0.5, fontFamily: '"Space Mono", monospace', fontSize: 30 }}>/{total}</span>
+      </div>
+    );
+  }
+
+  if (counter.style === "bars") {
+    return (
+      <div style={wrap}>
+        {Array.from({ length: total }).map((_, i) => (
+          <span
+            key={i}
+            style={{
+              width: i === index ? 56 : 28,
+              height: 8,
+              borderRadius: 999,
+              background: color,
+              opacity: i <= index ? 1 : 0.28,
+              transition: "all .2s",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // dots
+  return (
+    <div style={wrap}>
+      {Array.from({ length: total }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            width: i === index ? 30 : 14,
+            height: 14,
+            borderRadius: 999,
+            background: color,
+            opacity: i === index ? 1 : 0.32,
+            transition: "all .2s",
+          }}
+        />
+      ))}
+    </div>
   );
 }
 

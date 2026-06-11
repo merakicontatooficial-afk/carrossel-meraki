@@ -79,6 +79,7 @@ export default function App() {
       kitId: kit.id,
       logo: t.logo ? { ...t.logo } : { src: null, show: true, position: "br", scale: 1, everySlide: true },
       frame: t.frame ? { ...t.frame } : undefined,
+      counter: t.counter ? { ...t.counter } : undefined,
       slides: cloneSlides(t.slides),
       updatedAt: Date.now(),
     });
@@ -154,6 +155,7 @@ export default function App() {
         kit: { ...kit, id: uid("kit"), name },
         logo: { ...open.logo },
         frame: open.frame ? { ...open.frame } : undefined,
+        counter: open.counter ? { ...open.counter } : undefined,
       },
       ...all,
     ]);

@@ -78,13 +78,25 @@ export interface SlideColors {
 
 export type SlideKind = "cover" | "value" | "proof" | "cta";
 
+/** Override do logo só deste slide (posição livre). Ausente = herda o padrão do carrossel. */
+export interface SlideLogoOverride {
+  x: number;
+  y: number;
+  scale?: number;
+  show?: boolean;
+}
+
 export interface Slide {
   id: string;
   kind?: SlideKind;
   elements: Element[];
   bg?: ColorToken; // token = herda marca
   bgImage?: string; // dataURL opcional
+  bgScale?: number; // zoom da foto de fundo (1 = cover; >1 aproxima)
+  bgPosX?: number; // pan horizontal em % (-50..50; 0 = centro)
+  bgPosY?: number; // pan vertical em %
   scrim?: number; // 0–100: gradiente escuro de baixo pra cima sobre o fundo (estilo viral)
+  logoOverride?: SlideLogoOverride;
   colors: SlideColors;
 }
 
@@ -120,12 +132,27 @@ export interface CarouselLogo {
   everySlide?: boolean; // mostrar em todos os slides (default) ou só na capa
 }
 
-/** Faixas PNG decorativas fixas no topo e na base de todos os slides. */
+/**
+ * PNGs decorativos sobrepostos no topo e na base de todos os slides.
+ * Overlay POR CIMA de tudo, com aspecto natural (não cortam o conteúdo).
+ */
 export interface CarouselFrame {
   top: string | null;
   bottom: string | null;
-  topH: number; // altura em px no canvas 1350
-  bottomH: number;
+  topScale: number; // largura em % do canvas (100 = largura cheia)
+  bottomScale: number;
+  topOffset: number; // deslocamento vertical em px (negativo sobe pra fora)
+  bottomOffset: number;
+}
+
+export type CounterStyle = "none" | "dots" | "bars" | "fraction" | "number";
+export type CounterPos = "bc" | "br" | "bl" | "tc" | "tr";
+
+export interface CarouselCounter {
+  style: CounterStyle;
+  pos: CounterPos;
+  accent?: boolean; // usa cor de acento (senão cor de texto)
+  hideOnCover?: boolean; // não mostra no primeiro slide
 }
 
 export interface Carousel {
@@ -135,6 +162,7 @@ export interface Carousel {
   kitId: string;
   logo: CarouselLogo;
   frame?: CarouselFrame;
+  counter?: CarouselCounter;
   slides: Slide[];
   collectionId?: string;
   updatedAt: number;
@@ -148,6 +176,7 @@ export interface Template {
   kit?: BrandKit; // snapshot do look (cores/fontes) — templates carregam o design completo
   logo?: CarouselLogo;
   frame?: CarouselFrame;
+  counter?: CarouselCounter;
 }
 
 export interface Collection {
