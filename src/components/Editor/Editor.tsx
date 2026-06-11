@@ -230,6 +230,66 @@ export default function Editor({
 
           <CounterPanel counter={carousel.counter} onChange={(counter) => onChange({ ...carousel, counter })} />
 
+          {carousel.counter && carousel.counter.style !== "none" && (
+            <Section
+              title={`Marcador no slide ${safeIndex + 1}`}
+              right={
+                slide.counterOverride ? (
+                  <button
+                    type="button"
+                    title="Voltar ao marcador padrão"
+                    onClick={() => patchSlide(safeIndex, { counterOverride: undefined })}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-violet-300 hover:bg-white/10"
+                  >
+                    <RotateCcw size={11} /> padrão
+                  </button>
+                ) : undefined
+              }
+            >
+              <label className="mb-2 flex items-center gap-2 text-xs text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={slide.counterOverride?.hide ?? false}
+                  onChange={(e) =>
+                    patchSlide(safeIndex, {
+                      counterOverride: { ...(slide.counterOverride ?? {}), hide: e.target.checked },
+                    })
+                  }
+                />
+                Ocultar marcador neste slide
+              </label>
+              {slide.counterOverride && (slide.counterOverride.x != null || slide.counterOverride.y != null) ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="X">
+                    <NumberInput value={slide.counterOverride.x ?? 0} onChange={(x) => patchSlide(safeIndex, { counterOverride: { ...slide.counterOverride!, x } })} />
+                  </Field>
+                  <Field label="Y">
+                    <NumberInput value={slide.counterOverride.y ?? 0} onChange={(y) => patchSlide(safeIndex, { counterOverride: { ...slide.counterOverride!, y } })} />
+                  </Field>
+                </div>
+              ) : (
+                !slide.counterOverride?.hide && (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-zinc-500">Posição igual ao padrão.</p>
+                    <Btn
+                      onClick={() =>
+                        patchSlide(safeIndex, {
+                          counterOverride: { ...(slide.counterOverride ?? {}), x: carousel.counter!.x ?? 420, y: carousel.counter!.y ?? 1250 },
+                        })
+                      }
+                      title="Dar posição própria ao marcador neste slide"
+                    >
+                      <Move size={12} /> Posição própria
+                    </Btn>
+                  </div>
+                )
+              )}
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                No modo manual, arraste o marcador na prévia: sem posição própria, ele move em <b>todos</b> os slides; com posição própria, só neste.
+              </p>
+            </Section>
+          )}
+
           <Section
             title={`Cor do slide ${safeIndex + 1}`}
             right={
@@ -324,6 +384,14 @@ export default function Editor({
                 logoOverride: { ...(slide.logoOverride ?? { show: true }), x, y },
               })
             }
+            onMoveCounter={(x, y) => {
+              // se o slide tem marcador próprio → move só ele; senão move global (todos)
+              if (slide.counterOverride) {
+                patchSlide(safeIndex, { counterOverride: { ...slide.counterOverride, x, y } });
+              } else {
+                onChange({ ...carousel, counter: { ...carousel.counter!, x, y } });
+              }
+            }}
           />
           <Filmstrip
             carousel={carousel}

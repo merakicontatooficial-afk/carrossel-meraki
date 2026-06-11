@@ -97,6 +97,7 @@ export interface Slide {
   bgPosY?: number; // pan vertical em %
   scrim?: number; // 0–100: gradiente escuro de baixo pra cima sobre o fundo (estilo viral)
   logoOverride?: SlideLogoOverride;
+  counterOverride?: SlideCounterOverride;
   colors: SlideColors;
 }
 
@@ -151,8 +152,17 @@ export type CounterPos = "bc" | "br" | "bl" | "tc" | "tr";
 export interface CarouselCounter {
   style: CounterStyle;
   pos: CounterPos;
+  x?: number; // posição livre global (px no canvas); definida = ignora `pos`
+  y?: number;
   accent?: boolean; // usa cor de acento (senão cor de texto)
   hideOnCover?: boolean; // não mostra no primeiro slide
+}
+
+/** Override do marcador só deste slide (mover ou ocultar). */
+export interface SlideCounterOverride {
+  x?: number;
+  y?: number;
+  hide?: boolean;
 }
 
 export interface Carousel {

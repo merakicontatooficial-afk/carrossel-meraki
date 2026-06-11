@@ -1,5 +1,14 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { BrandKit, Carousel, CarouselCounter, CarouselLogo, Element, Slide, SlideLogoOverride } from "../types";
+import type {
+  BrandKit,
+  Carousel,
+  CarouselCounter,
+  CarouselLogo,
+  Element,
+  Slide,
+  SlideCounterOverride,
+  SlideLogoOverride,
+} from "../types";
 import { CANVAS_H, CANVAS_W, SAFE_MARGIN } from "../types";
 import { effectiveColors, resolveColor, resolveFont } from "../lib/resolve";
 import { renderRich } from "../lib/richtext";
@@ -30,6 +39,7 @@ export interface InteractiveCtx {
   onSelect: (id: string | null) => void;
   onPatch: (id: string, patch: Partial<Element>) => void;
   onMoveLogo?: (x: number, y: number) => void; // arrastar o logo cria override no slide
+  onMoveCounter?: (x: number, y: number) => void; // arrastar o marcador (global ou override do slide)
 }
 
 interface SlideCanvasProps {
@@ -76,8 +86,12 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
     (override ? override.show !== false : carousel.logo.show && logoOnThisSlide);
   const frame = carousel.frame;
   const counter = carousel.counter;
+  const counterOv = slide.counterOverride;
   const showCounter =
-    counter && counter.style !== "none" && !(counter.hideOnCover && slideIndex === 0);
+    counter &&
+    counter.style !== "none" &&
+    !counterOv?.hide &&
+    !(counter.hideOnCover && slideIndex === 0);
 
   return (
     <div
@@ -147,9 +161,11 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
       {showCounter && (
         <CounterView
           counter={counter!}
+          override={counterOv}
           index={slideIndex}
           total={carousel.slides.length}
           color={counter!.accent ? pal.accent : pal.text}
+          interactive={interactive}
         />
       )}
 
@@ -279,25 +295,72 @@ function LogoLayer({
 
 function CounterView({
   counter,
+  override,
   index,
   total,
   color,
+  interactive,
 }: {
   counter: CarouselCounter;
+  override?: SlideCounterOverride;
   index: number;
   total: number;
   color: string;
+  interactive?: InteractiveCtx;
 }) {
-  const pos: CSSProperties =
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const canDrag = !!interactive?.onMoveCounter;
+
+  // posição livre: override do slide > x/y global > preset `pos`
+  const freeX = override?.x ?? counter.x;
+  const freeY = override?.y ?? counter.y;
+  const free = freeX != null && freeY != null;
+
+  // content-sized (encolhe ao conteúdo); centros via transform pra permitir arraste consistente
+  const presetPos: CSSProperties =
     counter.pos === "br"
-      ? { bottom: SAFE_MARGIN, right: SAFE_MARGIN, justifyContent: "flex-end" }
+      ? { bottom: SAFE_MARGIN, right: SAFE_MARGIN }
       : counter.pos === "bl"
-        ? { bottom: SAFE_MARGIN, left: SAFE_MARGIN, justifyContent: "flex-start" }
+        ? { bottom: SAFE_MARGIN, left: SAFE_MARGIN }
         : counter.pos === "tc"
-          ? { top: SAFE_MARGIN, left: 0, right: 0, justifyContent: "center" }
+          ? { top: SAFE_MARGIN, left: "50%", transform: "translateX(-50%)" }
           : counter.pos === "tr"
-            ? { top: SAFE_MARGIN, right: SAFE_MARGIN, justifyContent: "flex-end" }
-            : { bottom: SAFE_MARGIN, left: 0, right: 0, justifyContent: "center" };
+            ? { top: SAFE_MARGIN, right: SAFE_MARGIN }
+            : { bottom: SAFE_MARGIN, left: "50%", transform: "translateX(-50%)" };
+
+  const onDown = (e: React.PointerEvent) => {
+    if (!interactive?.onMoveCounter || !wrapRef.current) return;
+    e.stopPropagation();
+    // posição visual real (em coords do canvas), válida pra preset centralizado ou canto
+    const parent = wrapRef.current.offsetParent as HTMLElement | null;
+    let bx = wrapRef.current.offsetLeft;
+    let by = wrapRef.current.offsetTop;
+    if (parent) {
+      const wr = wrapRef.current.getBoundingClientRect();
+      const pr = parent.getBoundingClientRect();
+      bx = (wr.left - pr.left) / interactive.scale;
+      by = (wr.top - pr.top) / interactive.scale;
+    }
+    dragRef.current = { px: e.clientX, py: e.clientY, x: bx, y: by };
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    document.body.classList.add("cg-dragging");
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d || !interactive?.onMoveCounter) return;
+    const nx = Math.round(d.x + (e.clientX - d.px) / interactive.scale);
+    const ny = Math.round(d.y + (e.clientY - d.py) / interactive.scale);
+    interactive.onMoveCounter(nx, ny);
+  };
+  const onUp = () => {
+    dragRef.current = null;
+    document.body.classList.remove("cg-dragging");
+  };
 
   const wrap: CSSProperties = {
     position: "absolute",
@@ -305,13 +368,23 @@ function CounterView({
     alignItems: "center",
     gap: 14,
     zIndex: 250,
-    pointerEvents: "none",
-    ...pos,
+    pointerEvents: canDrag ? "auto" : "none",
+    cursor: canDrag ? "grab" : undefined,
+    outline: canDrag ? "1px dashed rgba(34,211,238,0.4)" : undefined,
+    outlineOffset: 6,
+    ...(free ? { left: freeX, top: freeY } : presetPos),
+  };
+
+  const dragProps = {
+    ref: wrapRef,
+    onPointerDown: canDrag ? onDown : undefined,
+    onPointerMove: canDrag ? onMove : undefined,
+    onPointerUp: canDrag ? onUp : undefined,
   };
 
   if (counter.style === "fraction") {
     return (
-      <div style={{ ...wrap, fontFamily: '"Space Mono", ui-monospace, monospace', fontSize: 34, fontWeight: 700, letterSpacing: 2 }}>
+      <div {...dragProps} style={{ ...wrap, fontFamily: '"Space Mono", ui-monospace, monospace', fontSize: 34, fontWeight: 700, letterSpacing: 2 }}>
         <span style={{ color }}>
           {String(index + 1).padStart(2, "0")}
           <span style={{ opacity: 0.45 }}> / {String(total).padStart(2, "0")}</span>
@@ -322,7 +395,7 @@ function CounterView({
 
   if (counter.style === "number") {
     return (
-      <div style={{ ...wrap, alignItems: "baseline", gap: 8 }}>
+      <div {...dragProps} style={{ ...wrap, alignItems: "baseline", gap: 8 }}>
         <span style={{ color, fontFamily: '"Archivo Black", system-ui, sans-serif', fontSize: 72, lineHeight: 1 }}>
           {String(index + 1).padStart(2, "0")}
         </span>
@@ -333,7 +406,7 @@ function CounterView({
 
   if (counter.style === "bars") {
     return (
-      <div style={wrap}>
+      <div {...dragProps} style={wrap}>
         {Array.from({ length: total }).map((_, i) => (
           <span
             key={i}
@@ -353,7 +426,7 @@ function CounterView({
 
   // dots
   return (
-    <div style={wrap}>
+    <div {...dragProps} style={wrap}>
       {Array.from({ length: total }).map((_, i) => (
         <span
           key={i}

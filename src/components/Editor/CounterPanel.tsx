@@ -61,6 +61,18 @@ export default function CounterPanel({ counter, onChange }: Props) {
             <input type="checkbox" checked={c.hideOnCover ?? false} onChange={(e) => set({ hideOnCover: e.target.checked })} />
             Esconder na capa (slide 1)
           </label>
+          {counter.x != null && counter.y != null && (
+            <button
+              type="button"
+              onClick={() => set({ x: undefined, y: undefined })}
+              className="mt-2 text-[11px] text-violet-300 hover:underline"
+            >
+              Resetar posição (voltar ao canto)
+            </button>
+          )}
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+            No modo manual, arraste o marcador na prévia pra mover em todos os slides.
+          </p>
         </>
       )}
     </Section>
