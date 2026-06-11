@@ -7,6 +7,7 @@ import { exportCarousel } from "../../lib/export";
 import { Btn, ColorInput, Field, Section, Select } from "../ui";
 import IdentityPanel from "./IdentityPanel";
 import LogoUploader from "./LogoUploader";
+import FramePanel from "./FramePanel";
 import StructuredForm from "./StructuredForm";
 import ManualInspector from "./ManualInspector";
 import Preview from "./Preview";
@@ -16,7 +17,6 @@ import { ArrowLeft, Bookmark, Download, Lock, Pencil, Unlock, Wand2 } from "luci
 interface Props {
   carousel: Carousel;
   kit: BrandKit;
-  kits: BrandKit[];
   onChange: (c: Carousel) => void;
   onUpdateCustomKit: (kit: BrandKit) => void;
   onCreateCustomKit: (kit: BrandKit) => void;
@@ -27,7 +27,6 @@ interface Props {
 export default function Editor({
   carousel,
   kit,
-  kits,
   onChange,
   onUpdateCustomKit,
   onCreateCustomKit,
@@ -139,14 +138,6 @@ export default function Editor({
       <div className="flex min-h-0 flex-1">
         {/* coluna de controle */}
         <aside className="w-[340px] shrink-0 overflow-y-auto border-r border-white/8 bg-zinc-950/60">
-          <Section title="Empresa">
-            <Select
-              value={carousel.kitId}
-              onChange={(kitId) => onChange({ ...carousel, kitId })}
-              options={kits.map((k) => ({ value: k.id, label: k.locked ? `🔒 ${k.name}` : k.name }))}
-            />
-          </Section>
-
           <Section title="Estrutura">
             <Select
               value={carousel.templateId}
@@ -166,6 +157,8 @@ export default function Editor({
           <IdentityPanel kit={kit} onUpdateKit={onUpdateCustomKit} onCreateKit={onCreateCustomKit} />
 
           <LogoUploader logo={carousel.logo} onChange={(logo) => onChange({ ...carousel, logo })} />
+
+          <FramePanel frame={carousel.frame} onChange={(frame) => onChange({ ...carousel, frame })} />
 
           <Section
             title={`Cor do slide ${safeIndex + 1}`}

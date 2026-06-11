@@ -1,15 +1,14 @@
 import { useState } from "react";
 import type { BrandKit } from "../../types";
-import { uid } from "../../types";
 import { AVAILABLE_FONTS } from "../../lib/resolve";
 import { extractPalette, type PaletteSuggestion } from "../../lib/palette";
 import { Btn, ColorInput, Field, FileButton, Section, Select, inputCls } from "../ui";
-import { Lock, Palette, Unlock } from "lucide-react";
+import { Palette } from "lucide-react";
 
 interface Props {
   kit: BrandKit;
-  onUpdateKit: (kit: BrandKit) => void; // edita kit destravado (custom)
-  onCreateKit: (kit: BrandKit) => void; // cria custom kit e troca o carrossel pra ele
+  onUpdateKit: (kit: BrandKit) => void; // edita o kit próprio do carrossel
+  onCreateKit?: (kit: BrandKit) => void; // mantido por compatibilidade (não usado)
 }
 
 function Swatch({ color, label }: { color: string; label: string }) {
@@ -21,31 +20,17 @@ function Swatch({ color, label }: { color: string; label: string }) {
   );
 }
 
-export default function IdentityPanel({ kit, onUpdateKit, onCreateKit }: Props) {
+export default function IdentityPanel({ kit, onUpdateKit }: Props) {
   const [suggestion, setSuggestion] = useState<PaletteSuggestion | null>(null);
-
-  const unlockCopy = () => {
-    if (
-      !confirm(
-        `"${kit.name}" é um kit travado de marca. Criar uma cópia editável? O original permanece intacto.`
-      )
-    )
-      return;
-    onCreateKit({ ...kit, id: uid("kit"), name: `${kit.name} (cópia)`, locked: false });
-  };
 
   const applyPalette = () => {
     if (!suggestion) return;
-    onCreateKit({
+    onUpdateKit({
       ...kit,
-      id: uid("kit"),
-      name: "Kit da paleta",
-      locked: false,
       bg: suggestion.bg,
       text: suggestion.text,
       accent: suggestion.accent,
       surface: suggestion.bg,
-      glow: suggestion.accent,
     });
     setSuggestion(null);
   };
@@ -53,20 +38,7 @@ export default function IdentityPanel({ kit, onUpdateKit, onCreateKit }: Props) 
   const fontOptions = AVAILABLE_FONTS.map((f) => ({ value: f, label: f }));
 
   return (
-    <Section
-      title="Identidade"
-      right={
-        kit.locked ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-            <Lock size={10} /> travada
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-            <Unlock size={10} /> editável
-          </span>
-        )
-      }
-    >
+    <Section title="Identidade (cores e fontes)">
       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5">
         <Swatch color={kit.bg} label="fundo" />
         <Swatch color={kit.text} label="texto" />
@@ -74,72 +46,60 @@ export default function IdentityPanel({ kit, onUpdateKit, onCreateKit }: Props) 
         <Swatch color={kit.muted} label="suave" />
         {kit.glow && <Swatch color={kit.glow} label="brilho" />}
       </div>
-      <p className="mb-3 text-[11px] text-zinc-500">
-        {kit.fontDisplay} (display) · {kit.fontBody} (corpo) · {kit.fontLabel} (label)
-      </p>
 
-      {kit.locked ? (
-        <Btn onClick={unlockCopy}>
-          <Unlock size={13} /> Destravar (criar cópia editável)
-        </Btn>
-      ) : (
-        <div className="space-y-1">
-          <Field label="Nome do kit">
-            <input className={inputCls} value={kit.name} onChange={(e) => onUpdateKit({ ...kit, name: e.target.value })} />
+      <div className="space-y-1">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Fundo">
+            <ColorInput value={kit.bg} onChange={(bg) => onUpdateKit({ ...kit, bg })} />
           </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Fundo">
-              <ColorInput value={kit.bg} onChange={(bg) => onUpdateKit({ ...kit, bg })} />
-            </Field>
-            <Field label="Texto">
-              <ColorInput value={kit.text} onChange={(text) => onUpdateKit({ ...kit, text })} />
-            </Field>
-            <Field label="Acento">
-              <ColorInput value={kit.accent} onChange={(accent) => onUpdateKit({ ...kit, accent })} />
-            </Field>
-            <Field label="Suave">
-              <ColorInput value={kit.muted} onChange={(muted) => onUpdateKit({ ...kit, muted })} />
-            </Field>
-          </div>
-          <Field label="Acento 2 — gradiente no *destaque* (vazio = cor sólida)">
-            <ColorInput value={kit.accent2 ?? ""} onChange={(v) => onUpdateKit({ ...kit, accent2: v || null })} />
+          <Field label="Texto">
+            <ColorInput value={kit.text} onChange={(text) => onUpdateKit({ ...kit, text })} />
           </Field>
-          <Field label="Brilho (vazio = sem brilho)">
-            <ColorInput value={kit.glow ?? ""} onChange={(glow) => onUpdateKit({ ...kit, glow: glow || null, motif: glow ? "glow" : "minimal" })} />
+          <Field label="Acento">
+            <ColorInput value={kit.accent} onChange={(accent) => onUpdateKit({ ...kit, accent })} />
           </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Fonte display">
-              <Select value={kit.fontDisplay} onChange={(fontDisplay) => onUpdateKit({ ...kit, fontDisplay })} options={fontOptions} />
-            </Field>
-            <Field label="Fonte corpo">
-              <Select value={kit.fontBody} onChange={(fontBody) => onUpdateKit({ ...kit, fontBody })} options={fontOptions} />
-            </Field>
-            <Field label="Fonte label">
-              <Select value={kit.fontLabel} onChange={(fontLabel) => onUpdateKit({ ...kit, fontLabel })} options={fontOptions} />
-            </Field>
-            <Field label="Eyebrow">
-              <Select
-                value={kit.eyebrow}
-                onChange={(v) => onUpdateKit({ ...kit, eyebrow: v as BrandKit["eyebrow"] })}
-                options={[
-                  { value: "handle", label: "Pílula @handle (viral)" },
-                  { value: "pill-index", label: "Pílula com índice" },
-                  { value: "badge", label: "Badge preenchido" },
-                  { value: "minimal", label: "Minimal" },
-                ]}
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Logo (texto)">
-              <input className={inputCls} value={kit.logo} onChange={(e) => onUpdateKit({ ...kit, logo: e.target.value })} />
-            </Field>
-            <Field label="Sub (opcional)">
-              <input className={inputCls} value={kit.sub ?? ""} onChange={(e) => onUpdateKit({ ...kit, sub: e.target.value || undefined })} />
-            </Field>
-          </div>
+          <Field label="Suave">
+            <ColorInput value={kit.muted} onChange={(muted) => onUpdateKit({ ...kit, muted })} />
+          </Field>
         </div>
-      )}
+        <Field label="Acento 2 — gradiente no *destaque* (vazio = cor sólida)">
+          <ColorInput value={kit.accent2 ?? ""} onChange={(v) => onUpdateKit({ ...kit, accent2: v || null })} />
+        </Field>
+        <Field label="Brilho (vazio = sem brilho)">
+          <ColorInput value={kit.glow ?? ""} onChange={(glow) => onUpdateKit({ ...kit, glow: glow || null, motif: glow ? "glow" : "minimal" })} />
+        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Fonte display">
+            <Select value={kit.fontDisplay} onChange={(fontDisplay) => onUpdateKit({ ...kit, fontDisplay })} options={fontOptions} />
+          </Field>
+          <Field label="Fonte corpo">
+            <Select value={kit.fontBody} onChange={(fontBody) => onUpdateKit({ ...kit, fontBody })} options={fontOptions} />
+          </Field>
+          <Field label="Fonte label">
+            <Select value={kit.fontLabel} onChange={(fontLabel) => onUpdateKit({ ...kit, fontLabel })} options={fontOptions} />
+          </Field>
+          <Field label="Eyebrow / @handle">
+            <Select
+              value={kit.eyebrow}
+              onChange={(v) => onUpdateKit({ ...kit, eyebrow: v as BrandKit["eyebrow"] })}
+              options={[
+                { value: "handle", label: "Pílula @handle (viral)" },
+                { value: "pill-index", label: "Pílula com índice" },
+                { value: "badge", label: "Badge preenchido" },
+                { value: "minimal", label: "Minimal" },
+              ]}
+            />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="@handle / logo (texto)">
+            <input className={inputCls} value={kit.logo} onChange={(e) => onUpdateKit({ ...kit, logo: e.target.value })} />
+          </Field>
+          <Field label="Sub (opcional)">
+            <input className={inputCls} value={kit.sub ?? ""} onChange={(e) => onUpdateKit({ ...kit, sub: e.target.value || undefined })} />
+          </Field>
+        </div>
+      </div>
 
       <div className="mt-4 border-t border-white/8 pt-3">
         <FileButton
@@ -164,7 +124,7 @@ export default function IdentityPanel({ kit, onUpdateKit, onCreateKit }: Props) 
             </div>
             <div className="flex gap-2">
               <Btn variant="primary" onClick={applyPalette}>
-                Criar kit com essa paleta
+                Aplicar essa paleta
               </Btn>
               <Btn onClick={() => setSuggestion(null)}>Descartar</Btn>
             </div>

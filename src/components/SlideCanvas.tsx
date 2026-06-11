@@ -1,9 +1,26 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { BrandKit, Carousel, Element, Slide } from "../types";
+import type { BrandKit, Carousel, CarouselLogo, Element, Slide } from "../types";
 import { CANVAS_H, CANVAS_W, SAFE_MARGIN } from "../types";
 import { effectiveColors, resolveColor, resolveFont } from "../lib/resolve";
 import { renderRich } from "../lib/richtext";
-import { ImageIcon } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  Bookmark,
+  Heart,
+  ImageIcon,
+  MessageCircle,
+  Send,
+} from "lucide-react";
+
+const CTA_ICONS = {
+  "arrow-right": ArrowRight,
+  "arrow-down": ArrowDown,
+  chat: MessageCircle,
+  bookmark: Bookmark,
+  heart: Heart,
+  send: Send,
+} as const;
 
 export type CanvasMode = "edit" | "preview" | "export";
 
@@ -49,7 +66,10 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
 
   const sorted = [...slide.elements].sort((a, b) => a.z - b.z);
 
-  const manualLogo = carousel.logo.src && carousel.logo.show ? carousel.logo : null;
+  const logoOnThisSlide =
+    carousel.logo.everySlide === false ? slideIndex === 0 : true;
+  const manualLogo = carousel.logo.src && carousel.logo.show && logoOnThisSlide ? carousel.logo : null;
+  const frame = carousel.frame;
 
   return (
     <div
@@ -90,6 +110,24 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
         <div style={{ position: "absolute", inset: 0, backgroundImage: glowLayer, pointerEvents: "none" }} />
       )}
 
+      {/* molduras PNG topo/base (mesma faixa em todos os slides) */}
+      {frame?.top && (
+        <img
+          src={frame.top}
+          alt=""
+          draggable={false}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: frame.topH, objectFit: "cover", zIndex: 6, pointerEvents: "none" }}
+        />
+      )}
+      {frame?.bottom && (
+        <img
+          src={frame.bottom}
+          alt=""
+          draggable={false}
+          style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: frame.bottomH, objectFit: "cover", zIndex: 6, pointerEvents: "none" }}
+        />
+      )}
+
       {sorted.map((el) => (
         <ElementView
           key={el.id}
@@ -117,7 +155,7 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
   );
 }
 
-function ManualLogo({ logo }: { logo: { src: string | null; position: string } }) {
+function ManualLogo({ logo }: { logo: CarouselLogo }) {
   const pos: CSSProperties =
     logo.position === "tl"
       ? { top: SAFE_MARGIN, left: SAFE_MARGIN }
@@ -126,11 +164,12 @@ function ManualLogo({ logo }: { logo: { src: string | null; position: string } }
         : logo.position === "bl"
           ? { bottom: SAFE_MARGIN, left: SAFE_MARGIN }
           : { bottom: SAFE_MARGIN, right: SAFE_MARGIN };
+  const scale = logo.scale ?? 1;
   return (
     <img
       src={logo.src!}
       alt="logo"
-      style={{ position: "absolute", maxWidth: 240, maxHeight: 110, objectFit: "contain", zIndex: 200, ...pos }}
+      style={{ position: "absolute", maxWidth: 240 * scale, maxHeight: 110 * scale, objectFit: "contain", zIndex: 200, ...pos }}
       draggable={false}
     />
   );
@@ -313,6 +352,20 @@ function ElementContent({
 }) {
   const pal = effectiveColors(slide, kit);
 
+  if (el.type === "social") {
+    const color = resolveColor(el.color ?? "text", slide, kit, pal.text);
+    const size = Math.min(el.h, 64);
+    const justify = el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start";
+    return (
+      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: justify, gap: el.gap ?? 48, color }}>
+        <Heart size={size} strokeWidth={1.8} />
+        <MessageCircle size={size} strokeWidth={1.8} />
+        <Send size={size} strokeWidth={1.8} />
+        <Bookmark size={size} strokeWidth={1.8} style={{ marginLeft: "auto" }} />
+      </div>
+    );
+  }
+
   if (el.type === "shape") {
     const fill = resolveColor(el.fill ?? "accent", slide, kit, pal.accent);
     return (
@@ -462,40 +515,50 @@ function ElementContent({
     );
   }
 
-  if (el.role === "cta-primary") {
-    return (
-      <div
-        style={{
-          ...baseStyle,
-          backgroundColor: pal.accent,
-          color: resolveColor(el.color ?? "bg", slide, kit, pal.bg),
-          borderRadius: 999,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          lineHeight: 1.1,
-        }}
-      >
-        <span>{renderRich(el.text ?? "", { accent: pal.bg, bg: pal.accent, muted: pal.bg })}</span>
-      </div>
-    );
-  }
+  if (el.role === "cta-primary" || el.role === "cta-secondary") {
+    // variante padrão por compatibilidade: primary=solid; secondary=outline em slide cta, senão texto puro
+    const variant =
+      el.ctaVariant ?? (el.role === "cta-primary" ? "solid" : slide.kind === "cta" ? "outline" : "text");
+    const Icon = el.ctaIcon && el.ctaIcon !== "none" ? CTA_ICONS[el.ctaIcon] : null;
+    const iconSize = (el.fontSize ?? 34) * 0.95;
 
-  if (el.role === "cta-secondary" && slide.kind === "cta") {
+    if (variant === "text") {
+      const justify = el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start";
+      return (
+        <div style={{ ...baseStyle, display: "flex", alignItems: "center", justifyContent: justify, gap: "0.4em", lineHeight: 1.15 }}>
+          <span>{rich}</span>
+          {Icon && <Icon size={iconSize} strokeWidth={2.4} style={{ flexShrink: 0 }} />}
+        </div>
+      );
+    }
+
+    // pílula (solid / soft / outline)
+    const box: CSSProperties =
+      variant === "solid"
+        ? { backgroundColor: pal.accent, color: resolveColor(el.color ?? "bg", slide, kit, pal.bg) }
+        : variant === "soft"
+          ? { backgroundColor: `${pal.accent}26`, color: pal.accent, border: `2px solid ${pal.accent}55` }
+          : { backgroundColor: "transparent", color: pal.accent, border: `3px solid ${pal.accent}` };
+    const richColors =
+      variant === "solid"
+        ? { accent: box.color as string, bg: pal.accent, muted: box.color as string }
+        : { accent: pal.accent, bg: pal.bg, muted: pal.accent };
     return (
       <div
         style={{
           ...baseStyle,
-          border: `3px solid ${pal.accent}`,
-          color: resolveColor(el.color ?? "accent", slide, kit, pal.accent),
+          ...box,
           borderRadius: 999,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          gap: "0.5em",
           lineHeight: 1.1,
+          padding: "0 0.4em",
         }}
       >
-        <span>{rich}</span>
+        <span>{renderRich(el.text ?? "", richColors)}</span>
+        {Icon && <Icon size={iconSize} strokeWidth={2.6} style={{ flexShrink: 0 }} />}
       </div>
     );
   }

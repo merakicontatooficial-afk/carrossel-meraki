@@ -8,6 +8,7 @@ import {
   ChevronsDown,
   ChevronsUp,
   Copy,
+  Heart,
   ImagePlus,
   Minus,
   Square,
@@ -130,6 +131,9 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
             <Btn title="Adicionar linha" onClick={() => addElement({ type: "shape", shape: "line", fill: "accent", h: 10, w: 200 })}>
               <Minus size={13} />
             </Btn>
+            <Btn title="Adicionar barra social (curtir/comentar/salvar/enviar)" onClick={() => addElement({ type: "social", color: "text", h: 90, w: CANVAS_W - 2 * SAFE_MARGIN, gap: 56, align: "left" })}>
+              <Heart size={13} />
+            </Btn>
           </div>
         }
       >
@@ -147,7 +151,9 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                   ? `📝 ${(e.role ?? "texto").toUpperCase()} · ${(e.text ?? "").slice(0, 28) || "(vazio)"}`
                   : e.type === "image"
                     ? `🖼️ imagem${e.src ? "" : " (vazia)"}`
-                    : `▪️ ${e.shape === "line" ? "linha" : "retângulo"}`}
+                    : e.type === "social"
+                      ? "❤️ barra social"
+                      : `▪️ ${e.shape === "line" ? "linha" : "retângulo"}`}
               </button>
             </li>
           ))}
@@ -240,12 +246,52 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                 CAIXA ALTA
               </label>
               <TokenColorField label="Cor" value={el.color} onChange={(color) => onPatchElement(el.id, { color })} />
+              {(el.role === "cta-primary" || el.role === "cta-secondary") && (
+                <div className="grid grid-cols-2 gap-2 rounded-lg border border-white/8 bg-white/[0.03] p-2">
+                  <Field label="Estilo do botão">
+                    <Select
+                      value={el.ctaVariant ?? "text"}
+                      onChange={(v) => onPatchElement(el.id, { ctaVariant: v as Element["ctaVariant"] })}
+                      options={[
+                        { value: "text", label: "Só texto" },
+                        { value: "solid", label: "Pílula sólida" },
+                        { value: "soft", label: "Pílula suave" },
+                        { value: "outline", label: "Contorno" },
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Ícone">
+                    <Select
+                      value={el.ctaIcon ?? "none"}
+                      onChange={(v) => onPatchElement(el.id, { ctaIcon: v as Element["ctaIcon"] })}
+                      options={[
+                        { value: "none", label: "Nenhum" },
+                        { value: "arrow-right", label: "Seta →" },
+                        { value: "arrow-down", label: "Seta ↓" },
+                        { value: "chat", label: "Comentar 💬" },
+                        { value: "bookmark", label: "Salvar 🔖" },
+                        { value: "heart", label: "Curtir ♥" },
+                        { value: "send", label: "Enviar ➤" },
+                      ]}
+                    />
+                  </Field>
+                </div>
+              )}
               {(el.fontSize ?? 40) < 40 && el.role === "body" && (
                 <p className="mb-2 rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300">
                   ⚠ Corpo abaixo de 40px fica difícil de ler no celular.
                 </p>
               )}
             </>
+          )}
+
+          {el.type === "social" && (
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Espaço entre ícones">
+                <NumberInput value={el.gap ?? 48} min={12} max={160} onChange={(v) => onPatchElement(el.id, { gap: v })} />
+              </Field>
+              <TokenColorField label="Cor" value={el.color} onChange={(color) => onPatchElement(el.id, { color })} />
+            </div>
           )}
 
           {el.type === "image" && (

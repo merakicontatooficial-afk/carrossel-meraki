@@ -1,6 +1,7 @@
 import type { Element, Slide, TextRole } from "../../types";
 import { checkText } from "../../config/guardrails";
-import { Field, FileButton, Section, TextArea, Btn } from "../ui";
+import { ACTION_PRESETS, SWIPE_PRESETS, clampCtaY, type CtaPreset } from "../../config/cta";
+import { Field, FileButton, Section, Select, TextArea, Btn } from "../ui";
 import { ImagePlus, Trash2 } from "lucide-react";
 
 const ROLE_LABELS: Record<TextRole, string> = {
@@ -23,11 +24,27 @@ interface Props {
  * Modo Estruturado: só os textos por papel + imagens. Guardrails ativos —
  * o limite de palavras trava a digitação além do teto.
  */
+function presetMatch(el: Element, presets: CtaPreset[]): string {
+  const found = presets.find(
+    (p) => p.patch.ctaVariant === (el.ctaVariant ?? "text") && (p.patch.ctaIcon ?? "none") === (el.ctaIcon ?? "none")
+  );
+  return found?.id ?? "";
+}
+
 export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: Props) {
   const textEls = slide.elements
     .filter((e) => e.type === "text" && e.role !== "logo" && e.role !== "index")
     .sort((a, b) => a.y - b.y);
   const imageEls = slide.elements.filter((e) => e.type === "image");
+  const ctaEls = slide.elements
+    .filter((e) => e.type === "text" && (e.role === "cta-primary" || e.role === "cta-secondary"))
+    .sort((a, b) => a.y - b.y);
+
+  const applyPreset = (el: Element, preset: CtaPreset) => {
+    const patch = { ...preset.patch };
+    if (el.role === "cta-secondary" && patch.h != null) patch.y = clampCtaY(el.y, patch.h);
+    onPatchElement(el.id, patch);
+  };
 
   return (
     <>
@@ -90,6 +107,34 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
               )}
             </div>
           ))}
+        </Section>
+      )}
+
+      {ctaEls.length > 0 && (
+        <Section title="Botão / CTA">
+          {ctaEls.map((el) => {
+            const isSwipe = el.role === "cta-secondary";
+            const presets = isSwipe ? SWIPE_PRESETS : ACTION_PRESETS;
+            const current = presetMatch(el, presets);
+            return (
+              <Field key={el.id} label={isSwipe ? "Botão de passar (swipe)" : "Botão de ação"}>
+                <Select
+                  value={current}
+                  onChange={(id) => {
+                    const p = presets.find((x) => x.id === id);
+                    if (p) applyPreset(el, p);
+                  }}
+                  options={[
+                    ...(current ? [] : [{ value: "", label: "Personalizado…" }]),
+                    ...presets.map((p) => ({ value: p.id, label: p.label })),
+                  ]}
+                />
+              </Field>
+            );
+          })}
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            O texto do botão você edita lá em cima. Aqui escolhe o estilo (pílula, contorno) e o ícone.
+          </p>
         </Section>
       )}
 

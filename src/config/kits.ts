@@ -126,3 +126,11 @@ export function getKit(id: string, customKits: BrandKit[] = []): BrandKit {
     KITS[0]
   );
 }
+
+import { uid } from "../types";
+
+/** Kit editável próprio de um carrossel, clonado de uma base (sem trava). */
+export function makeCarouselKit(baseId: string, name = "Marca do carrossel"): BrandKit {
+  const base = KITS.find((k) => k.id === baseId) ?? KITS[0];
+  return { ...base, id: uid("kit"), name, locked: false };
+}

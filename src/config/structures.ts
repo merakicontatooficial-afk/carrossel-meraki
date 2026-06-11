@@ -95,6 +95,7 @@ const mediaCard = (o: { y: number; h: number }) =>
     z: 15,
   });
 
+// "Arraste →" discreto no canto (variante minimalista; trocável por pílula no editor).
 const swipeNudge = () =>
   el({
     type: "text",
@@ -105,10 +106,31 @@ const swipeNudge = () =>
     fontWeight: 600,
     align: "right",
     color: "text",
+    ctaVariant: "text",
     x: CANVAS_W - M - 360,
     w: 360,
     y: 1262,
     h: 50,
+    z: 20,
+  });
+
+// Barra de ícones do Instagram (curtir/comentar/salvar/enviar) — fecho de salvamento.
+const socialBar = (y: number) =>
+  el({ type: "social", x: M, y, w: W, h: 90, z: 20, color: "text", gap: 56, align: "left" });
+
+const logoBlock = (o: { y: number; align?: "left" | "center"; size?: number }) =>
+  el({
+    type: "text",
+    role: "logo",
+    text: "",
+    fontRole: "label",
+    fontSize: o.size ?? 28,
+    fontWeight: 700,
+    letterSpacing: 1,
+    align: o.align ?? "center",
+    color: "text",
+    y: o.y,
+    h: 70,
     z: 20,
   });
 
@@ -253,13 +275,123 @@ function ctaSlide(o: { headline: string; sub: string; primary: string; secondary
   ]);
 }
 
+/** Slide de salvamento padrão (ref G2D): logo, "Gostou desse conteúdo?", pílula salvar + barra social. */
+function saveSlide(): Slide {
+  return slide("cta", [
+    logoBlock({ y: 150, align: "center", size: 34 }),
+    el({
+      type: "text",
+      role: "eyebrow",
+      text: "Obrigado por chegar até aqui",
+      fontRole: "body",
+      fontSize: 34,
+      fontWeight: 400,
+      align: "center",
+      color: "muted",
+      y: 300,
+      h: 60,
+      z: 20,
+    }),
+    { ...headline({ text: "Gostou desse *conteúdo*?", y: 400, size: 88, align: "center", h: 360 }), uppercase: false, letterSpacing: -2 },
+    el({
+      type: "text",
+      role: "cta-primary",
+      text: "Salve para não esquecer!",
+      fontRole: "body",
+      fontSize: 40,
+      fontWeight: 700,
+      align: "center",
+      color: "bg",
+      ctaVariant: "soft",
+      ctaIcon: "bookmark",
+      x: 150,
+      w: 780,
+      y: 800,
+      h: 108,
+      z: 20,
+    }),
+    socialBar(1010),
+  ]);
+}
+
+/** Slide de CTA por comentário (ref G2D img1): headline + bullets + "Comenta EU QUERO" + botão. */
+function commentCtaSlide(o: {
+  headline: string;
+  body: string;
+  bullets: [string, string, string];
+  comment: string;
+  button: string;
+}): Slide {
+  const bulletEl = (text: string, y: number) =>
+    el({
+      type: "text",
+      role: "body",
+      text,
+      fontRole: "body",
+      fontSize: 40,
+      fontWeight: 600,
+      align: "left",
+      color: "text",
+      x: M + 70,
+      w: W - 70,
+      y,
+      h: 70,
+      z: 20,
+    });
+  return slide("cta", [
+    { ...headline({ text: o.headline, y: 110, size: 62, h: 220 }), uppercase: false, letterSpacing: -1 },
+    body({ text: o.body, y: 340, h: 200, size: 38 }),
+    // marcadores com bolinha de acento
+    el({ type: "shape", shape: "rect", fill: "accent", x: M, y: 612, w: 26, h: 26, radius2: 13, z: 21 }),
+    bulletEl(o.bullets[0], 600),
+    el({ type: "shape", shape: "rect", fill: "accent", x: M, y: 712, w: 26, h: 26, radius2: 13, z: 21 }),
+    bulletEl(o.bullets[1], 700),
+    el({ type: "shape", shape: "rect", fill: "accent", x: M, y: 812, w: 26, h: 26, radius2: 13, z: 21 }),
+    bulletEl(o.bullets[2], 800),
+    el({
+      type: "text",
+      role: "body",
+      text: o.comment,
+      fontRole: "display",
+      fontSize: 40,
+      fontWeight: 800,
+      align: "center",
+      color: "text",
+      uppercase: false,
+      y: 930,
+      h: 150,
+      z: 20,
+    }),
+    el({
+      type: "text",
+      role: "cta-primary",
+      text: o.button,
+      fontRole: "body",
+      fontSize: 40,
+      fontWeight: 700,
+      align: "center",
+      color: "bg",
+      ctaVariant: "solid",
+      ctaIcon: "chat",
+      x: 270,
+      w: 540,
+      y: 1120,
+      h: 108,
+      z: 20,
+    }),
+  ]);
+}
+
 // --- estruturas ---------------------------------------------------------------
+
+export type DefaultKit = "livre-escuro" | "livre-claro";
 
 export interface Structure {
   id: string;
   name: string;
   framework: string;
   description: string;
+  defaultKit: DefaultKit;
   build: () => Slide[];
 }
 
@@ -267,9 +399,10 @@ export const STRUCTURES: Structure[] = [
   {
     id: "viral_foto",
     name: "Foto viral (full-bleed)",
-    framework: "cover(foto) → 4× value(foto) → cta",
+    framework: "cover(foto) → 4× value(foto) → comenta → salvar",
     description:
       "Linhagem MyPostFlow escura: foto cinematográfica de fundo em cada slide, scrim e texto ancorado embaixo. Suba uma foto por slide.",
+    defaultKit: "livre-escuro",
     build: () => [
       coverFoto({
         headline: "O ==segredo== dos posts que crescem",
@@ -291,20 +424,23 @@ export const STRUCTURES: Structure[] = [
         headline: "Feche pedindo ==ação==",
         body: "Salvar, enviar, comentar. Quem não pede, não recebe.",
       }),
-      ctaSlide({
-        headline: "Aplica isso no *seu* conteúdo",
-        sub: "Comece pelo próximo post. Uma ideia por slide.",
-        primary: "Salve este post 📌",
-        secondary: "Envie pra quem precisa ver",
+      commentCtaSlide({
+        headline: "É aqui que entra a *sua oferta*",
+        body: "A gente te ajuda a estruturar conteúdo que cresce de verdade.",
+        bullets: ["Estratégia por formato", "Gestão de indicadores", "Estrutura operacional"],
+        comment: "Comenta ==EU QUERO== aqui embaixo",
+        button: "Comenta aqui!",
       }),
+      saveSlide(),
     ],
   },
   {
     id: "caso_claro",
     name: "Editorial claro (case)",
-    framework: "cover → 3× value(card) → cta",
+    framework: "cover → 3× value(card) → cta → salvar",
     description:
-      "Linhagem MyPostFlow clara: fundo branco, headline preta com *acento*, cards de foto arredondados. Use com o kit Livre · Claro.",
+      "Linhagem MyPostFlow clara: fundo branco, headline preta com *acento*, cards de foto arredondados.",
+    defaultKit: "livre-claro",
     build: () => [
       slide("cover", [
         handlePill(96),
@@ -331,13 +467,15 @@ export const STRUCTURES: Structure[] = [
         primary: "Salve este case 📌",
         secondary: "Siga pra mais análises",
       }),
+      saveSlide(),
     ],
   },
   {
     id: "lista",
     name: "Lista / Educacional",
-    framework: "cover → 4× value → cta",
+    framework: "cover → 4× value → cta → salvar",
     description: "Hook na capa, 4 itens de valor, CTA duplo.",
+    defaultKit: "livre-escuro",
     build: () => [
       coverFoto({
         headline: "4 erros que ==travam== seu perfil",
@@ -365,13 +503,15 @@ export const STRUCTURES: Structure[] = [
         primary: "Salve este post 📌",
         secondary: "Envie pra quem precisa ver isso",
       }),
+      saveSlide(),
     ],
   },
   {
     id: "pas",
     name: "Problema → Solução → Prova",
-    framework: "cover(dor) → value(por quê) → value(virada) → proof → cta",
+    framework: "cover(dor) → value → value → proof → cta → salvar",
     description: "Abre na dor, explica a causa, mostra a virada e prova com resultado.",
+    defaultKit: "livre-escuro",
     build: () => [
       coverFoto({
         headline: "Seu perfil não cresce por *um* motivo",
@@ -395,13 +535,15 @@ export const STRUCTURES: Structure[] = [
         primary: "Salve pra não esquecer 📌",
         secondary: "Comenta “FOCO” que a gente te ajuda",
       }),
+      saveSlide(),
     ],
   },
   {
     id: "tutorial",
     name: "Passo a passo",
-    framework: "cover → 3× value(passos) → cta",
+    framework: "cover → 3× value(passos) → cta → salvar",
     description: "Promessa na capa e três passos práticos.",
+    defaultKit: "livre-escuro",
     build: () => [
       coverFoto({
         headline: "Stories que ==vendem== em 3 passos",
@@ -425,13 +567,15 @@ export const STRUCTURES: Structure[] = [
         primary: "Salve o roteiro 📌",
         secondary: "Siga pra mais conteúdo assim",
       }),
+      saveSlide(),
     ],
   },
   {
     id: "antes_depois",
     name: "Antes / Depois",
-    framework: "cover → value(antes) → value(depois) → value(como) → cta",
+    framework: "cover → antes → depois → como → cta → salvar",
     description: "Contraste entre o antes e o depois, com o caminho no meio.",
+    defaultKit: "livre-escuro",
     build: () => [
       coverFoto({
         headline: "O perfil antes e ==depois== da estratégia",
@@ -455,13 +599,15 @@ export const STRUCTURES: Structure[] = [
         primary: "Salve este post 📌",
         secondary: "Envie pra um amigo que precisa",
       }),
+      saveSlide(),
     ],
   },
   {
     id: "historia",
     name: "História / Autoridade",
-    framework: "cover(verdade) → value(história) → value(lição) → cta",
+    framework: "cover(verdade) → história → lição → cta → salvar",
     description: "Verdade contraintuitiva, micro-história e a lição extraída.",
+    defaultKit: "livre-escuro",
     build: () => [
       coverFoto({
         headline: "Postar ==menos== fez a gente crescer mais",
@@ -481,6 +627,7 @@ export const STRUCTURES: Structure[] = [
         primary: "Salve essa ideia 📌",
         secondary: "Siga pra mais bastidores",
       }),
+      saveSlide(),
     ],
   },
   {
@@ -488,6 +635,7 @@ export const STRUCTURES: Structure[] = [
     name: "Livre (em branco)",
     framework: "1 slide vazio — monte do zero",
     description: "Um slide com o básico (handle, headline, corpo) pra você criar seu próprio estilo no modo manual.",
+    defaultKit: "livre-escuro",
     build: () => [
       slide("value", [
         handlePill(96),
@@ -500,4 +648,8 @@ export const STRUCTURES: Structure[] = [
 
 export function getStructure(id: string): Structure {
   return STRUCTURES.find((s) => s.id === id) ?? STRUCTURES[0];
+}
+
+export function structureDefaultKit(id: string): DefaultKit {
+  return getStructure(id).defaultKit;
 }

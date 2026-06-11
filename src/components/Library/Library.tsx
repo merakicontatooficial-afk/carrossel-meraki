@@ -14,9 +14,9 @@ interface Props {
   kits: BrandKit[];
   customKits: BrandKit[];
   onOpen: (id: string) => void;
-  onCreate: (structureId: string, kitId: string) => void;
-  onCreateFromTemplate: (templateId: string, kitId: string) => void;
-  onCreateContinuous: (dataUrl: string, kitId: string) => void;
+  onCreate: (structureId: string) => void;
+  onCreateFromTemplate: (templateId: string) => void;
+  onCreateContinuous: (dataUrl: string) => void;
   onDuplicateCarousel: (id: string) => void;
   onDeleteCarousel: (id: string) => void;
   onAssignCollection: (carouselId: string, collectionId: string | undefined) => void;
@@ -30,7 +30,6 @@ export default function Library(props: Props) {
   const [filter, setFilter] = useState<string | null>(null);
   const [panel, setPanel] = useState<"new" | "template" | "continuous" | null>(null);
   const [structureId, setStructureId] = useState(STRUCTURES[0].id);
-  const [kitId, setKitId] = useState(props.kits[0]?.id ?? "padrao");
   const [templateId, setTemplateId] = useState("");
 
   const visible = props.carousels.filter((c) => filter === null || c.collectionId === filter);
@@ -38,8 +37,6 @@ export default function Library(props: Props) {
   for (const c of props.carousels) {
     if (c.collectionId) counts[c.collectionId] = (counts[c.collectionId] ?? 0) + 1;
   }
-
-  const kitOptions = props.kits.map((k) => ({ value: k.id, label: k.locked ? `🔒 ${k.name}` : k.name }));
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -64,32 +61,30 @@ export default function Library(props: Props) {
         <div className="mb-6 rounded-xl border border-white/10 bg-zinc-900/70 p-4">
           {panel === "new" && (
             <div className="flex flex-wrap items-end gap-3">
-              <div className="w-64">
-                <Field label="Estrutura viral">
+              <div className="w-72">
+                <Field label="Estrutura">
                   <Select value={structureId} onChange={setStructureId} options={STRUCTURES.map((s) => ({ value: s.id, label: s.name }))} />
                 </Field>
                 <p className="-mt-1 text-[11px] text-zinc-500">{STRUCTURES.find((s) => s.id === structureId)?.framework}</p>
-              </div>
-              <div className="w-56">
-                <Field label="Empresa (brand kit)">
-                  <Select value={kitId} onChange={setKitId} options={kitOptions} />
-                </Field>
               </div>
               <Btn
                 variant="primary"
                 className="mb-3"
                 onClick={() => {
-                  props.onCreate(structureId, kitId);
+                  props.onCreate(structureId);
                   setPanel(null);
                 }}
               >
                 Criar
               </Btn>
+              <p className="mb-3 max-w-xs text-[11px] text-zinc-500">
+                Já vem com cores e fontes editáveis. Ajuste tudo no editor e salve como seu próprio template.
+              </p>
             </div>
           )}
           {panel === "template" && (
             <div className="flex flex-wrap items-end gap-3">
-              <div className="w-64">
+              <div className="w-72">
                 <Field label="Template salvo">
                   <Select
                     value={templateId || props.templates[0]?.id || ""}
@@ -98,17 +93,12 @@ export default function Library(props: Props) {
                   />
                 </Field>
               </div>
-              <div className="w-56">
-                <Field label="Empresa (brand kit)">
-                  <Select value={kitId} onChange={setKitId} options={kitOptions} />
-                </Field>
-              </div>
               <Btn
                 variant="primary"
                 className="mb-3"
                 onClick={() => {
                   const id = templateId || props.templates[0]?.id;
-                  if (id) props.onCreateFromTemplate(id, kitId);
+                  if (id) props.onCreateFromTemplate(id);
                   setPanel(null);
                 }}
               >
@@ -128,21 +118,16 @@ export default function Library(props: Props) {
           )}
           {panel === "continuous" && (
             <div className="flex flex-wrap items-end gap-3">
-              <div className="w-56">
-                <Field label="Empresa (brand kit)">
-                  <Select value={kitId} onChange={setKitId} options={kitOptions} />
-                </Field>
-              </div>
               <div className="mb-3">
                 <FileButton
                   label="Subir imagem wide e fatiar"
                   onFile={(dataUrl) => {
-                    props.onCreateContinuous(dataUrl, kitId);
+                    props.onCreateContinuous(dataUrl);
                     setPanel(null);
                   }}
                 />
               </div>
-              <p className="mb-3 text-[11px] text-zinc-500">
+              <p className="mb-3 max-w-sm text-[11px] text-zinc-500">
                 A imagem é escalada pra 1350 de altura e fatiada em tiras 1080×1350 alinhadas — uma por slide.
               </p>
             </div>

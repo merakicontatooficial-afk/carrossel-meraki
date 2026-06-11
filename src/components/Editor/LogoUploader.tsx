@@ -1,5 +1,5 @@
 import type { CarouselLogo, LogoPosition } from "../../types";
-import { Btn, FileButton, Section } from "../ui";
+import { Btn, Field, FileButton, Section } from "../ui";
 import { Trash2 } from "lucide-react";
 
 const POSITIONS: { value: LogoPosition; label: string }[] = [
@@ -30,27 +30,48 @@ export default function LogoUploader({ logo, onChange }: Props) {
         )}
       </div>
       {logo.src && (
-        <div className="mt-3 flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-zinc-300">
-            <input type="checkbox" checked={logo.show} onChange={(e) => onChange({ ...logo, show: e.target.checked })} />
-            Mostrar
-          </label>
-          <div className="flex gap-1">
-            {POSITIONS.map((p) => (
-              <button
-                key={p.value}
-                type="button"
-                onClick={() => onChange({ ...logo, position: p.value })}
-                className={`h-8 w-8 rounded-lg border text-sm ${
-                  logo.position === p.value
-                    ? "border-violet-500 bg-violet-500/20 text-violet-200"
-                    : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+        <div className="mt-3 space-y-3">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-zinc-300">
+              <input type="checkbox" checked={logo.show} onChange={(e) => onChange({ ...logo, show: e.target.checked })} />
+              Mostrar
+            </label>
+            <div className="flex gap-1">
+              {POSITIONS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => onChange({ ...logo, position: p.value })}
+                  className={`h-8 w-8 rounded-lg border text-sm ${
+                    logo.position === p.value
+                      ? "border-violet-500 bg-violet-500/20 text-violet-200"
+                      : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
+          <Field label={`Tamanho — ${Math.round((logo.scale ?? 1) * 100)}%`}>
+            <input
+              type="range"
+              min={0.4}
+              max={2.5}
+              step={0.05}
+              value={logo.scale ?? 1}
+              onChange={(e) => onChange({ ...logo, scale: Number(e.target.value) })}
+              className="w-full"
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-xs text-zinc-300">
+            <input
+              type="checkbox"
+              checked={logo.everySlide !== false}
+              onChange={(e) => onChange({ ...logo, everySlide: e.target.checked })}
+            />
+            Em todos os slides (desmarque = só na capa)
+          </label>
         </div>
       )}
       {!logo.src && (

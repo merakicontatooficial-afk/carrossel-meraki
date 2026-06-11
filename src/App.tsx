@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { BrandKit, Carousel, Collection, Slide, Template } from "./types";
 import { uid } from "./types";
-import { KITS, getKit } from "./config/kits";
-import { getStructure } from "./config/structures";
+import { KITS, getKit, makeCarouselKit } from "./config/kits";
+import { getStructure, structureDefaultKit } from "./config/structures";
 import { storage } from "./lib/storage";
 import { cloneSlides } from "./lib/clone";
 import { sliceWideImage } from "./lib/slice";
@@ -48,35 +48,45 @@ export default function App() {
     setOpenId(c.id);
   };
 
-  const createCarousel = (structureId: string, kitId: string) => {
+  // cada carrossel embute o próprio kit editável (sem "empresa" pré-definida)
+  const createCarousel = (structureId: string) => {
     const structure = getStructure(structureId);
+    const kit = makeCarouselKit(structureDefaultKit(structureId), structure.name);
+    setCustomKits((all) => [...all, kit]);
     addCarousel({
       id: uid("car"),
-      name: `${structure.name} — ${getKit(kitId, customKits).name}`,
+      name: structure.name,
       templateId: structureId,
-      kitId,
-      logo: { src: null, show: true, position: "br" },
+      kitId: kit.id,
+      logo: { src: null, show: true, position: "br", scale: 1, everySlide: true },
       slides: structure.build(),
       updatedAt: Date.now(),
     });
   };
 
-  const createFromTemplate = (templateId: string, kitId: string) => {
+  const createFromTemplate = (templateId: string) => {
     const t = templates.find((x) => x.id === templateId);
     if (!t) return;
+    // restaura o look completo do template (kit/logo/moldura)
+    const kit: BrandKit = t.kit
+      ? { ...t.kit, id: uid("kit") }
+      : makeCarouselKit("livre-escuro", t.name);
+    setCustomKits((all) => [...all, kit]);
     addCarousel({
       id: uid("car"),
       name: `${t.name} (clone)`,
       templateId: t.framework,
-      kitId,
-      logo: { src: null, show: true, position: "br" },
+      kitId: kit.id,
+      logo: t.logo ? { ...t.logo } : { src: null, show: true, position: "br", scale: 1, everySlide: true },
+      frame: t.frame ? { ...t.frame } : undefined,
       slides: cloneSlides(t.slides),
       updatedAt: Date.now(),
     });
   };
 
-  const createContinuous = async (dataUrl: string, kitId: string) => {
-    const kit = getKit(kitId, customKits);
+  const createContinuous = async (dataUrl: string) => {
+    const kit = makeCarouselKit("livre-escuro", "Contínuo");
+    setCustomKits((all) => [...all, kit]);
     const slices = await sliceWideImage(dataUrl, kit.bg);
     const slides: Slide[] = slices.map((bgImage) => ({
       id: uid("sl"),
@@ -88,10 +98,10 @@ export default function App() {
     }));
     addCarousel({
       id: uid("car"),
-      name: `Contínuo — ${kit.name}`,
+      name: "Contínuo",
       templateId: "continuo",
-      kitId,
-      logo: { src: null, show: true, position: "br" },
+      kitId: kit.id,
+      logo: { src: null, show: true, position: "br", scale: 1, everySlide: true },
       slides,
       updatedAt: Date.now(),
     });
@@ -100,21 +110,54 @@ export default function App() {
   const duplicateCarousel = (id: string) => {
     const src = carousels.find((c) => c.id === id);
     if (!src) return;
+    // clona também o kit, pra que editar a cópia não afete o original
+    const srcKit = getKit(src.kitId, customKits);
+    const kitCopy: BrandKit = { ...srcKit, id: uid("kit") };
+    setCustomKits((all) => [...all, kitCopy]);
     setCarousels((all) => [
-      { ...src, id: uid("car"), name: `${src.name} (cópia)`, slides: cloneSlides(src.slides), updatedAt: Date.now() },
+      {
+        ...src,
+        id: uid("car"),
+        name: `${src.name} (cópia)`,
+        kitId: kitCopy.id,
+        slides: cloneSlides(src.slides),
+        updatedAt: Date.now(),
+      },
       ...all,
     ]);
+  };
+
+  const deleteCarousel = (id: string) => {
+    const target = carousels.find((c) => c.id === id);
+    setCarousels((all) => all.filter((c) => c.id !== id));
+    // remove o kit órfão (só se nenhum outro carrossel usa)
+    if (target) {
+      setCarousels((rest) => {
+        const stillUsed = rest.some((c) => c.kitId === target.kitId);
+        if (!stillUsed) setCustomKits((ks) => ks.filter((k) => k.id !== target.kitId));
+        return rest;
+      });
+    }
   };
 
   const saveAsTemplate = () => {
     if (!open) return;
     const name = prompt("Nome do template:", open.name);
     if (!name) return;
+    const kit = getKit(open.kitId, customKits);
     setTemplates((all) => [
-      { id: uid("tpl"), name, framework: open.templateId, slides: cloneSlides(open.slides) },
+      {
+        id: uid("tpl"),
+        name,
+        framework: open.templateId,
+        slides: cloneSlides(open.slides),
+        kit: { ...kit, id: uid("kit"), name },
+        logo: { ...open.logo },
+        frame: open.frame ? { ...open.frame } : undefined,
+      },
       ...all,
     ]);
-    alert(`Template "${name}" salvo. Use "A partir de template" na biblioteca pra clonar.`);
+    alert(`Template "${name}" salvo com o design completo. Use "A partir de template" pra clonar.`);
   };
 
   const createCollection = () => {
@@ -163,7 +206,6 @@ export default function App() {
       <Editor
         carousel={open}
         kit={getKit(open.kitId, customKits)}
-        kits={allKits}
         onChange={updateCarousel}
         onUpdateCustomKit={updateCustomKit}
         onCreateCustomKit={createCustomKit}
@@ -183,9 +225,9 @@ export default function App() {
       onOpen={setOpenId}
       onCreate={createCarousel}
       onCreateFromTemplate={createFromTemplate}
-      onCreateContinuous={(d, k) => void createContinuous(d, k)}
+      onCreateContinuous={(d) => void createContinuous(d)}
       onDuplicateCarousel={duplicateCarousel}
-      onDeleteCarousel={(id) => setCarousels((all) => all.filter((c) => c.id !== id))}
+      onDeleteCarousel={deleteCarousel}
       onAssignCollection={(carouselId, collectionId) =>
         setCarousels((all) => all.map((c) => (c.id === carouselId ? { ...c, collectionId } : c)))
       }

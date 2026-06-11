@@ -4,7 +4,7 @@ export const CANVAS_W = 1080;
 export const CANVAS_H = 1350;
 export const SAFE_MARGIN = 80;
 
-export type ElementType = "text" | "image" | "shape";
+export type ElementType = "text" | "image" | "shape" | "social";
 
 /** Token da marca ("accent" | "text" | "bg") OU hex literal escolhido manualmente */
 export type ColorToken = "accent" | "text" | "bg" | string;
@@ -19,6 +19,19 @@ export type TextRole =
   | "logo";
 
 export type FontRole = "display" | "body" | "label";
+
+/** Ícone opcional dentro de um botão de CTA. */
+export type CtaIcon =
+  | "none"
+  | "arrow-right"
+  | "arrow-down"
+  | "chat"
+  | "bookmark"
+  | "heart"
+  | "send";
+
+/** Aparência do botão de CTA. text = sem caixa (só texto + ícone). */
+export type CtaVariant = "text" | "solid" | "soft" | "outline";
 
 export interface Element {
   id: string;
@@ -40,6 +53,9 @@ export interface Element {
   align?: "left" | "center" | "right";
   uppercase?: boolean;
   color?: ColorToken;
+  // cta (texto com role cta-*)
+  ctaIcon?: CtaIcon;
+  ctaVariant?: CtaVariant;
   // image
   src?: string;
   fit?: "cover" | "contain";
@@ -49,6 +65,8 @@ export interface Element {
   shape?: "rect" | "line";
   fill?: ColorToken;
   radius2?: number;
+  // social (barra de ícones do Instagram: curtir/comentar/salvar/enviar)
+  gap?: number;
 }
 
 export interface SlideColors {
@@ -98,6 +116,16 @@ export interface CarouselLogo {
   src: string | null;
   show: boolean;
   position: LogoPosition;
+  scale?: number; // multiplicador do tamanho-base (1 = padrão; 0.4–2.5)
+  everySlide?: boolean; // mostrar em todos os slides (default) ou só na capa
+}
+
+/** Faixas PNG decorativas fixas no topo e na base de todos os slides. */
+export interface CarouselFrame {
+  top: string | null;
+  bottom: string | null;
+  topH: number; // altura em px no canvas 1350
+  bottomH: number;
 }
 
 export interface Carousel {
@@ -106,6 +134,7 @@ export interface Carousel {
   templateId: string;
   kitId: string;
   logo: CarouselLogo;
+  frame?: CarouselFrame;
   slides: Slide[];
   collectionId?: string;
   updatedAt: number;
@@ -116,6 +145,9 @@ export interface Template {
   name: string;
   framework: string;
   slides: Slide[];
+  kit?: BrandKit; // snapshot do look (cores/fontes) — templates carregam o design completo
+  logo?: CarouselLogo;
+  frame?: CarouselFrame;
 }
 
 export interface Collection {
