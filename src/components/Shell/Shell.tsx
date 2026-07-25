@@ -1,18 +1,20 @@
 import type { ReactNode } from "react";
 import Sidebar, { type View } from "./Sidebar";
-import { Search, Sparkles, Plus } from "lucide-react";
+import { Search, Sparkles, Plus, LogOut } from "lucide-react";
 
 interface Props {
   view: View;
   onNavigate: (v: View) => void;
   onGerarIA: () => void;
   onCriar: () => void;
+  userName?: string;
+  onLogout?: () => void;
   search: string;
   onSearch: (s: string) => void;
   children: ReactNode;
 }
 
-export default function Shell({ view, onNavigate, onGerarIA, onCriar, search, onSearch, children }: Props) {
+export default function Shell({ view, onNavigate, onGerarIA, onCriar, userName, onLogout, search, onSearch, children }: Props) {
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
       <Sidebar view={view} onNavigate={onNavigate} />
@@ -33,6 +35,12 @@ export default function Shell({ view, onNavigate, onGerarIA, onCriar, search, on
           <button className="btn btn-primary" onClick={onGerarIA}>
             <Sparkles size={15} /> Gerar com IA
           </button>
+          {userName && (
+            <div className="flex items-center gap-2 pl-2">
+              <span className="hidden text-xs text-[var(--text-md)] sm:inline">{userName}</span>
+              <button className="icon-btn btn" title="Sair" onClick={onLogout}><LogOut size={15} /></button>
+            </div>
+          )}
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>

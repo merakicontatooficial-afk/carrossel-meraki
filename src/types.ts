@@ -170,17 +170,24 @@ export interface SlideCounterOverride {
   hide?: boolean;
 }
 
+export type CarouselStatus = "rascunho" | "revisao" | "aprovado" | "publicado";
+
 export interface Carousel {
   id: string;
   name: string;
   templateId: string;
   kitId: string;
+  kit?: BrandKit; // kit EMBUTIDO (persistência compartilhada no servidor)
   logo: CarouselLogo;
   frame?: CarouselFrame;
   counter?: CarouselCounter;
   slides: Slide[];
   collectionId?: string;
   updatedAt: number;
+  // atribuição/fluxo (biblioteca compartilhada)
+  ownerId?: number;
+  ownerName?: string;
+  status?: CarouselStatus;
 }
 
 export interface Template {
