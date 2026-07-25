@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BrandKit, Carousel, Element, Slide } from "../../types";
-import { uid } from "../../types";
+import { uid, CANVAS_W, CANVAS_H, SAFE_MARGIN } from "../../types";
 import { effectiveColors } from "../../lib/resolve";
 import { autoLayout } from "../../lib/aiCarousel";
 import { cloneSlides } from "../../lib/clone";
@@ -15,7 +15,19 @@ import StructuredForm from "./StructuredForm";
 import ManualInspector from "./ManualInspector";
 import Preview from "./Preview";
 import Filmstrip from "./Filmstrip";
-import { ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, ImageIcon, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, ImageIcon, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, StretchHorizontal, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
+
+/** Botões de alinhar o elemento selecionado no slide (barra superior do Estúdio). */
+const ALIGN_BTNS: { t?: string; i?: React.ReactNode; calc?: (el: Element) => Partial<Element>; sep?: boolean }[] = [
+  { t: "Alinhar à esquerda (margem)", i: <AlignStartVertical size={15} />, calc: () => ({ x: SAFE_MARGIN }) },
+  { t: "Centralizar na horizontal", i: <AlignCenterVertical size={15} />, calc: (el) => ({ x: Math.round((CANVAS_W - el.w) / 2) }) },
+  { t: "Alinhar à direita (margem)", i: <AlignEndVertical size={15} />, calc: (el) => ({ x: CANVAS_W - SAFE_MARGIN - el.w }) },
+  { t: "Largura entre as margens", i: <StretchHorizontal size={15} />, calc: () => ({ x: SAFE_MARGIN, w: CANVAS_W - 2 * SAFE_MARGIN }) },
+  { sep: true },
+  { t: "Alinhar ao topo (margem)", i: <AlignStartHorizontal size={15} />, calc: () => ({ y: SAFE_MARGIN }) },
+  { t: "Centralizar na vertical", i: <AlignCenterHorizontal size={15} />, calc: (el) => ({ y: Math.round((CANVAS_H - el.h) / 2) }) },
+  { t: "Alinhar à base (margem)", i: <AlignEndHorizontal size={15} />, calc: (el) => ({ y: CANVAS_H - SAFE_MARGIN - el.h }) },
+];
 
 interface Props {
   carousel: Carousel;
@@ -83,6 +95,7 @@ export default function Editor({
 
   const safeIndex = Math.min(index, carousel.slides.length - 1);
   const slide = carousel.slides[safeIndex];
+  const selEl = slide?.elements.find((e) => e.id === selectedId) ?? null;
 
   const setIndex = (i: number) => {
     setIndexRaw(i);
@@ -143,7 +156,20 @@ export default function Editor({
       if (mod && k === "c") { copyElement(); return; }
       if (mod && k === "v") { e.preventDefault(); pasteElement(); return; }
       if (mod && k === "d") { e.preventDefault(); copyElement(); pasteElement(); return; }
-      if ((k === "delete" || k === "backspace") && selectedId) { e.preventDefault(); deleteElement(); }
+      if ((k === "delete" || k === "backspace") && selectedId) { e.preventDefault(); deleteElement(); return; }
+
+      // setas movem o elemento selecionado (Shift = passo grande)
+      const SETAS: Record<string, [number, number]> = {
+        arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1],
+      };
+      const dir = SETAS[k];
+      if (dir && selectedId) {
+        e.preventDefault();
+        const alvo = carousel.slides[safeIndex]?.elements.find((x) => x.id === selectedId);
+        if (!alvo) return;
+        const passo = e.shiftKey ? 10 : 1;
+        patchElement(selectedId, { x: alvo.x + dir[0] * passo, y: alvo.y + dir[1] * passo });
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -294,6 +320,25 @@ export default function Editor({
           <button className="icon-btn btn" onClick={undo} title="Desfazer (Ctrl+Z)"><Undo2 size={15} /></button>
           <button className="icon-btn btn" onClick={redo} title="Refazer (Ctrl+Shift+Z)"><Redo2 size={15} /></button>
           <button className={`icon-btn btn ${showGrid ? "!border-transparent !bg-[var(--brand-sat)] !text-white" : ""}`} onClick={() => setShowGrid((g) => !g)} title="Grade de posicionamento"><Grid3x3 size={15} /></button>
+        </div>
+
+        {/* alinhamento do elemento selecionado (ativa ao clicar num elemento) */}
+        <div className="flex items-center gap-1 border-l border-white/10 pl-2" title={selEl ? undefined : "Selecione um elemento na prévia para alinhar"}>
+          {ALIGN_BTNS.map((b, i) =>
+            b.sep ? (
+              <span key={i} className="mx-0.5 h-5 w-px bg-white/10" />
+            ) : (
+              <button
+                key={i}
+                title={b.t}
+                disabled={!selEl}
+                onClick={() => selEl && patchElement(selEl.id, b.calc!(selEl))}
+                className="icon-btn btn disabled:opacity-30"
+              >
+                {b.i}
+              </button>
+            )
+          )}
         </div>
 
         {/* navegação de slides (centro) */}
