@@ -2,9 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// base = nome do repo no GitHub Pages
+// Deploy = VPS Meraki (carrossel.merakidigital.cloud) atrás do Caddy, na raiz do domínio.
 export default defineConfig({
-  base: "/carrossel-meraki/",
+  base: "/",
   plugins: [react(), tailwindcss()],
   server: {
     // em dev, /api vai pro backend Express (server/). Em produção o Caddy faz isso.
