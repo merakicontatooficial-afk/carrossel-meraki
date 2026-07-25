@@ -111,17 +111,21 @@ export default function App() {
     ]);
   };
 
+  // REGRA (peso do sistema): apagar carrossel = apagar TODAS as mídias dele.
+  // Hoje a mídia (bgImage / element.src em dataURL) vive DENTRO do objeto do
+  // carrossel no localStorage — remover o carrossel do array já descarta a mídia
+  // no próximo save (nada de store de mídia à parte). Quando a persistência for
+  // pro servidor, esta função é o ponto único que também deve apagar os arquivos.
   const deleteCarousel = (id: string) => {
     const target = carousels.find((c) => c.id === id);
-    setCarousels((all) => all.filter((c) => c.id !== id));
-    // remove o kit órfão (só se nenhum outro carrossel usa)
-    if (target) {
-      setCarousels((rest) => {
-        const stillUsed = rest.some((c) => c.kitId === target.kitId);
-        if (!stillUsed) setCustomKits((ks) => ks.filter((k) => k.id !== target.kitId));
-        return rest;
-      });
-    }
+    setCarousels((all) => {
+      const rest = all.filter((c) => c.id !== id);
+      // limpa o kit órfão junto (só se nenhum outro carrossel usa) — evita acúmulo
+      if (target && !rest.some((c) => c.kitId === target.kitId)) {
+        setCustomKits((ks) => ks.filter((k) => k.id !== target.kitId));
+      }
+      return rest;
+    });
   };
 
   const saveAsTemplate = () => {

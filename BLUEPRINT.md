@@ -405,6 +405,24 @@ a fonte da **interface Meraki**; as demais são para os **carrosséis dos client
 
 ---
 
+## Regra inviolável — limpeza de mídia (peso do sistema)
+
+> **Apagar um carrossel APAGA todas as mídias dele.** A mídia é o que mais pesa;
+> nada de mídia órfã acumulando.
+
+- **Hoje (localStorage):** a mídia (`slide.bgImage` e `element.src` em dataURL) vive
+  **embutida** no objeto do carrossel. Remover o carrossel do array já descarta a
+  mídia no próximo save. Ponto único de exclusão: `App.deleteCarousel`. Também
+  remove o **kit órfão** junto.
+- **Quando a persistência for pro servidor (fase futura):** mídia deve ir para
+  **arquivos em disco/objeto** (não dataURL no DB), e `deleteCarousel` no backend
+  **DEVE apagar os arquivos** correspondentes na mesma transação. Rodar também uma
+  **varredura de órfãos** periódica (arquivos sem carrossel apontando) como rede de
+  segurança. Templates são snapshots deliberados — a mídia deles é intencional e só
+  some quando o template é excluído.
+
+---
+
 ## 6. Arquitetura técnica
 
 ### 6.1 Stack recomendado (alinhado ao que a Meraki já opera)
