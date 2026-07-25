@@ -54,6 +54,9 @@ export interface Element {
   align?: "left" | "center" | "right";
   uppercase?: boolean;
   color?: ColorToken;
+  // ==realce== SÓ deste texto (sobrepõe o padrão do kit)
+  highlightBg?: ColorToken; // caixa do realce (padrão: acento)
+  highlightText?: ColorToken; // texto sobre o realce (padrão: cor de fundo)
   // cta (texto com role cta-*)
   ctaIcon?: CtaIcon;
   ctaVariant?: CtaVariant;
@@ -119,6 +122,9 @@ export interface BrandKit {
   accent: string;
   accent2?: string | null; // se definido, *destaque* vira gradiente accent→accent2
   glow?: string | null;
+  // ==realce== padrão de TODO o carrossel (cada texto pode sobrepor)
+  highlightBg?: string | null; // caixa do realce (vazio = acento)
+  highlightText?: string | null; // texto sobre o realce (vazio = cor de fundo)
   fontDisplay: string;
   fontBody: string;
   fontLabel: string;

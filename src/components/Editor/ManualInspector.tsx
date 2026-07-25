@@ -9,6 +9,7 @@ import {
   ChevronsUp,
   Copy,
   Heart,
+  Highlighter,
   ImagePlus,
   Minus,
   Sparkles,
@@ -256,6 +257,23 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                 CAIXA ALTA
               </label>
               <TokenColorField label="Cor" value={el.color} onChange={(color) => onPatchElement(el.id, { color })} />
+
+              {/* ==realce==: cor da caixa e do texto por cima, só deste elemento */}
+              {(el.text ?? "").includes("==") && (
+                <div className="mb-3 rounded-lg border border-white/8 bg-white/[0.03] p-2">
+                  <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-lo)]">
+                    <Highlighter size={12} /> Realce deste texto
+                  </div>
+                  <TokenColorField label="Caixa do realce" value={el.highlightBg ?? "accent"} onChange={(v) => onPatchElement(el.id, { highlightBg: v })} />
+                  <TokenColorField label="Texto sobre o realce" value={el.highlightText ?? "bg"} onChange={(v) => onPatchElement(el.id, { highlightText: v })} />
+                  {(el.highlightBg || el.highlightText) && (
+                    <button type="button" onClick={() => onPatchElement(el.id, { highlightBg: undefined, highlightText: undefined })} className="text-[11px] text-[var(--brand-hi)] hover:underline">
+                      Voltar ao padrão do carrossel
+                    </button>
+                  )}
+                </div>
+              )}
+
               {(el.role === "cta-primary" || el.role === "cta-secondary") && (
                 <div className="grid grid-cols-2 gap-2 rounded-lg border border-white/8 bg-white/[0.03] p-2">
                   <Field label="Estilo do botão">

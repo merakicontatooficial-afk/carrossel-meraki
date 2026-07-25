@@ -6,7 +6,7 @@ import { autoLayout } from "../../lib/aiCarousel";
 import { cloneSlides } from "../../lib/clone";
 import { exportCarousel } from "../../lib/export";
 import { api } from "../../lib/api";
-import { Btn, ColorInput, Field, FileButton, NumberInput, Section } from "../ui";
+import { AccordionGroup, Btn, ColorInput, Field, FileButton, NumberInput, Section } from "../ui";
 import IdentityPanel from "./IdentityPanel";
 import LogoUploader from "./LogoUploader";
 import FramePanel from "./FramePanel";
@@ -420,6 +420,8 @@ export default function Editor({
             </button>
           </div>
 
+          {/* acordeão exclusivo: abrir uma seção fecha as outras; todas começam fechadas */}
+          <AccordionGroup>
           <div className="px-4 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-lo)]">Slide atual</div>
 
           {manualMode ? (
@@ -660,6 +662,7 @@ export default function Editor({
               </div>
             )}
           </Section>
+          </AccordionGroup>
 
         </aside>
 

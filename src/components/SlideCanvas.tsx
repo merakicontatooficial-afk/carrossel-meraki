@@ -750,7 +750,17 @@ function ElementContent({
     whiteSpace: "pre-wrap",
     overflowWrap: "break-word",
   };
-  const richOpts = { accent: pal.accent, accent2: kit.accent2, bg: pal.bg, muted: pal.muted };
+  // ==realce==: cor do elemento > padrão do kit > acento/fundo
+  const hlBgTok = el.highlightBg ?? kit.highlightBg ?? undefined;
+  const hlTextTok = el.highlightText ?? kit.highlightText ?? undefined;
+  const richOpts = {
+    accent: pal.accent,
+    accent2: kit.accent2,
+    bg: pal.bg,
+    muted: pal.muted,
+    hlBg: hlBgTok ? resolveColor(hlBgTok, slide, kit, pal.accent) : undefined,
+    hlText: hlTextTok ? resolveColor(hlTextTok, slide, kit, pal.bg) : undefined,
+  };
   const rich = renderRich(el.text ?? "", richOpts);
 
   if (el.role === "eyebrow") {

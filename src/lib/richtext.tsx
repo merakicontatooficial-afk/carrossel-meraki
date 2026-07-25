@@ -19,6 +19,9 @@ export interface RichOptions {
   accent2?: string | null;
   bg: string;
   muted: string;
+  /** ==realce==: caixa (padrão = accent) e texto por cima (padrão = bg) */
+  hlBg?: string;
+  hlText?: string;
 }
 
 /** Converte texto com marcação em nodes React. Preserva quebras de linha. */
@@ -67,8 +70,8 @@ export function renderRich(text: string, opts: RichOptions): ReactNode[] {
           <span
             key={key}
             style={{
-              backgroundColor: opts.accent,
-              color: opts.bg,
+              backgroundColor: opts.hlBg || opts.accent,
+              color: opts.hlText || opts.bg,
               padding: "0.06em 0.26em",
               borderRadius: "0.26em",
               boxDecorationBreak: "clone",

@@ -3,7 +3,7 @@ import type { BrandKit } from "../../types";
 import { AVAILABLE_FONTS } from "../../lib/resolve";
 import { extractPalette, type PaletteSuggestion } from "../../lib/palette";
 import { Btn, ColorInput, Field, FileButton, Section, Select, inputCls } from "../ui";
-import { Palette } from "lucide-react";
+import { Highlighter, Palette } from "lucide-react";
 
 interface Props {
   kit: BrandKit;
@@ -65,6 +65,24 @@ export default function IdentityPanel({ kit, onUpdateKit }: Props) {
         <Field label="Acento 2 — gradiente no *destaque* (vazio = cor sólida)">
           <ColorInput value={kit.accent2 ?? ""} onChange={(v) => onUpdateKit({ ...kit, accent2: v || null })} />
         </Field>
+
+        {/* ==realce== padrão de TODO o carrossel (cada texto pode sobrepor no modo manual) */}
+        <div className="my-2 rounded-lg border border-white/8 bg-white/[0.03] p-2">
+          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-lo)]">
+            <Highlighter size={12} /> Realce ==assim== · todo o carrossel
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Caixa (vazio = acento)">
+              <ColorInput value={kit.highlightBg ?? ""} onChange={(v) => onUpdateKit({ ...kit, highlightBg: v || null })} />
+            </Field>
+            <Field label="Texto (vazio = fundo)">
+              <ColorInput value={kit.highlightText ?? ""} onChange={(v) => onUpdateKit({ ...kit, highlightText: v || null })} />
+            </Field>
+          </div>
+          <p className="text-[11px] leading-relaxed text-[var(--text-lo)]">
+            Vale para todos os slides. Um texto específico pode ter cores próprias no modo <b className="text-[var(--text-md)]">Ajuste manual</b>.
+          </p>
+        </div>
         <Field label="Brilho (vazio = sem brilho)">
           <ColorInput value={kit.glow ?? ""} onChange={(glow) => onUpdateKit({ ...kit, glow: glow || null, motif: glow ? "glow" : "minimal" })} />
         </Field>

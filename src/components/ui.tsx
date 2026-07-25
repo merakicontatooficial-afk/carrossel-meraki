@@ -1,5 +1,18 @@
-import { useId, useState, type ReactNode } from "react";
+import { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
+
+/**
+ * Acordeão EXCLUSIVO: dentro de um <AccordionGroup>, abrir uma seção fecha as
+ * outras — e todas começam fechadas. Fora do grupo, cada Section se vira sozinha
+ * (respeitando `defaultOpen`).
+ */
+const AccordionCtx = createContext<{ openId: string | null; toggle: (id: string) => void } | null>(null);
+
+export function AccordionGroup({ children }: { children: ReactNode }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+  return <AccordionCtx.Provider value={{ openId, toggle }}>{children}</AccordionCtx.Provider>;
+}
 
 /** Seção colapsável estilo MyPostFlow: linha com ícone + título + seta; abre/fecha. */
 export function Section({
@@ -15,10 +28,13 @@ export function Section({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const group = useContext(AccordionCtx);
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const open = group ? group.openId === title : localOpen;
+  const toggle = () => (group ? group.toggle(title) : setLocalOpen((o) => !o));
   return (
     <section className="border-b border-white/8">
-      <div className="flex cursor-pointer items-center gap-2.5 px-4 py-3.5 hover:bg-white/[0.03]" onClick={() => setOpen((o) => !o)}>
+      <div className="flex cursor-pointer items-center gap-2.5 px-4 py-3.5 hover:bg-white/[0.03]" onClick={toggle}>
         {icon && <span className="text-[var(--brand-hi)]">{icon}</span>}
         <span className="mr-auto text-[13px] font-medium text-white">{title}</span>
         {right && <span onClick={(e) => e.stopPropagation()}>{right}</span>}
