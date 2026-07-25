@@ -47,29 +47,30 @@ export function renderRich(text: string, opts: RichOptions): ReactNode[] {
           </span>
         );
       } else if (/^_[^_\n]+_$/.test(part)) {
+        // sublinhado SEM itálico, com traço mais grosso e afastado do texto
         out.push(
           <span
             key={key}
             style={{
-              fontStyle: "italic",
               textDecoration: "underline",
               textDecorationColor: opts.accent,
-              textDecorationThickness: "0.06em",
-              textUnderlineOffset: "0.12em",
+              textDecorationThickness: "0.12em",
+              textUnderlineOffset: "0.16em",
             }}
           >
             {part.slice(1, -1)}
           </span>
         );
       } else if (/^==[^=\n]+==$/.test(part)) {
+        // realce em bloco com cantos BEM arredondados (referência do Luiz)
         out.push(
           <span
             key={key}
             style={{
               backgroundColor: opts.accent,
               color: opts.bg,
-              padding: "0.02em 0.18em",
-              borderRadius: "0.08em",
+              padding: "0.06em 0.26em",
+              borderRadius: "0.26em",
               boxDecorationBreak: "clone",
               WebkitBoxDecorationBreak: "clone",
             }}

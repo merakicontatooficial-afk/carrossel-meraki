@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import "./buttons.css";
+// Clash Grotesk (Fontshare) — família 200–700 auto-hospedada em src/fonts/
+import "./clash-grotesk.css";
 
 // Fontes offline (@fontsource) — sem chamada externa em runtime.
 // Para ADICIONAR uma fonte: 1) npm i @fontsource/<nome>  2) importe os pesos aqui

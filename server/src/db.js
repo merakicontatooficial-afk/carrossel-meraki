@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS templates (
 CREATE TABLE IF NOT EXISTS collections (
   id    TEXT PRIMARY KEY,
   name  TEXT NOT NULL,
-  color TEXT
+  color TEXT,
+  brief TEXT                          -- markdown: personalidade/voz da marca (alimenta a IA)
 );
 CREATE TABLE IF NOT EXISTS media (
   hash       TEXT PRIMARY KEY,        -- sha256(conteúdo) truncado
@@ -46,13 +47,22 @@ CREATE TABLE IF NOT EXISTS media (
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS daily_trends (
+
   date       TEXT PRIMARY KEY,        -- YYYY-MM-DD (fuso America/Sao_Paulo)
   items      TEXT NOT NULL,           -- JSON [{titulo,categoria,fonte,quando,resumo}]
   created_at INTEGER NOT NULL
 );
 `);
 
-// Banco de usuários do Publisher — SOMENTE LEITURA (mesmos logins/senhas).
+// migração leve: bancos criados antes do campo `brief` (personalidade da marca)
+try {
+  const cols = db.prepare("PRAGMA table_info(collections)").all().map((c) => c.name);
+  if (!cols.includes("brief")) db.exec("ALTER TABLE collections ADD COLUMN brief TEXT");
+} catch (e) {
+  console.error("[db] migração collections.brief:", e.message);
+}
+
+// Banco de usuários do Publisher — SOMENTE LEITURA (login/consultas).
 let usersDb = null;
 export function getUsersDb() {
   if (usersDb) return usersDb;
@@ -63,6 +73,23 @@ export function getUsersDb() {
     return usersDb;
   } catch (e) {
     console.error("[db] não abriu USERS_DB_PATH:", e.message);
+    return null;
+  }
+}
+
+// Mesmo banco em LEITURA-ESCRITA — só para a gestão de acessos (conta dona).
+// WAL + busy_timeout deixam Publisher e carrossel escreverem sem corromper.
+let usersDbRW = null;
+export function getUsersDbRW() {
+  if (usersDbRW) return usersDbRW;
+  const path = process.env.USERS_DB_PATH;
+  if (!path) return null;
+  try {
+    usersDbRW = new Database(path, { fileMustExist: true });
+    usersDbRW.pragma("busy_timeout = 5000");
+    return usersDbRW;
+  } catch (e) {
+    console.error("[db] não abriu USERS_DB_PATH (rw):", e.message);
     return null;
   }
 }

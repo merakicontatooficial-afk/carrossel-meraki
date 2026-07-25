@@ -3,6 +3,12 @@ import { uid, CANVAS_W, CANVAS_H, SAFE_MARGIN } from "../../types";
 import { checkText } from "../../config/guardrails";
 import { Btn, ColorInput, Field, FileButton, SliderField, Section, Select, TextArea } from "../ui";
 import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignStartVertical,
   ArrowDown,
   ArrowUp,
   ChevronsDown,
@@ -13,9 +19,23 @@ import {
   Minus,
   Sparkles,
   Square,
+  StretchHorizontal,
   Trash2,
   Type,
 } from "lucide-react";
+
+/** Pesos disponíveis (as famílias do app cobrem 100–900; o navegador sintetiza o que faltar). */
+export const WEIGHTS = [
+  { value: "100", label: "100 · Thin" },
+  { value: "200", label: "200 · ExtraLight" },
+  { value: "300", label: "300 · Light" },
+  { value: "400", label: "400 · Regular" },
+  { value: "500", label: "500 · Medium" },
+  { value: "600", label: "600 · SemiBold" },
+  { value: "700", label: "700 · Bold" },
+  { value: "800", label: "800 · ExtraBold" },
+  { value: "900", label: "900 · Black" },
+];
 
 const TOKEN_OPTIONS = [
   { value: "accent", label: "Acento (marca)" },
@@ -223,11 +243,11 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                     ]}
                   />
                 </Field>
-                <Field label="Peso">
+                <Field label="Peso da fonte">
                   <Select
                     value={String(el.fontWeight ?? 400)}
                     onChange={(v) => onPatchElement(el.id, { fontWeight: Number(v) })}
-                    options={["400", "500", "600", "700", "800"].map((w) => ({ value: w, label: w }))}
+                    options={WEIGHTS}
                   />
                 </Field>
               </div>
@@ -347,6 +367,30 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
               <TokenColorField label="Preenchimento" value={el.fill} onChange={(fill) => onPatchElement(el.id, { fill })} />
             </>
           )}
+
+          <SliderField label="Opacidade (%)" value={el.opacity ?? 100} min={0} max={100} onChange={(v) => onPatchElement(el.id, { opacity: v })} />
+
+          <div className="mb-1 mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Alinhar no slide</div>
+          <div className="mb-3 flex gap-1">
+            {[
+              { t: "Alinhar à esquerda (margem)", i: <AlignStartVertical size={14} />, p: { x: SAFE_MARGIN } },
+              { t: "Centralizar na horizontal", i: <AlignCenterVertical size={14} />, p: { x: Math.round((CANVAS_W - el.w) / 2) } },
+              { t: "Alinhar à direita (margem)", i: <AlignEndVertical size={14} />, p: { x: CANVAS_W - SAFE_MARGIN - el.w } },
+              { t: "Largura entre as margens", i: <StretchHorizontal size={14} />, p: { x: SAFE_MARGIN, w: CANVAS_W - 2 * SAFE_MARGIN } },
+              { sep: true },
+              { t: "Alinhar ao topo (margem)", i: <AlignStartHorizontal size={14} />, p: { y: SAFE_MARGIN } },
+              { t: "Centralizar na vertical", i: <AlignCenterHorizontal size={14} />, p: { y: Math.round((CANVAS_H - el.h) / 2) } },
+              { t: "Alinhar à base (margem)", i: <AlignEndHorizontal size={14} />, p: { y: CANVAS_H - SAFE_MARGIN - el.h } },
+            ].map((b, i) =>
+              b.sep ? (
+                <span key={i} className="mx-0.5 w-px self-stretch bg-white/10" />
+              ) : (
+                <button key={i} title={b.t} onClick={() => onPatchElement(el.id, b.p as Partial<Element>)} className="flex h-8 flex-1 items-center justify-center rounded-md border border-white/10 text-[var(--text-md)] transition hover:bg-white/8 hover:text-white">
+                  {b.i}
+                </button>
+              )
+            )}
+          </div>
 
           <div className="mb-1 mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Posição & Tamanho</div>
           <SliderField label="Posição X" value={el.x} min={-200} max={CANVAS_W} onChange={(v) => onPatchElement(el.id, { x: v })} />

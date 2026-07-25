@@ -222,6 +222,16 @@ export default function App() {
     }
   };
 
+  // dossiê (.md) da marca — vira contexto obrigatório da IA nas gerações do cliente
+  const saveBrief = async (id: string, brief: string) => {
+    setCollections((all) => all.map((c) => (c.id === id ? { ...c, brief } : c)));
+    try {
+      await api.updateCollection(id, { brief });
+    } catch (e) {
+      alert("Falha ao salvar o dossiê: " + (e as Error).message);
+    }
+  };
+
   const deleteCollection = async (id: string) => {
     setCollections((all) => all.filter((c) => c.id !== id));
     setCarousels((all) => all.map((c) => (c.collectionId === id ? { ...c, collectionId: undefined } : c)));
@@ -322,9 +332,15 @@ export default function App() {
         )}
         {view === "trendings" && <TrendingsView onCreateFromTrend={(tema) => openWizard("ia", tema)} />}
         {view === "organizacao" && (
-          <OrganizacaoView collections={collections} counts={counts} onCreate={createCollection} onDelete={deleteCollection} />
+          <OrganizacaoView
+            collections={collections}
+            counts={counts}
+            onCreate={createCollection}
+            onDelete={deleteCollection}
+            onSaveBrief={saveBrief}
+          />
         )}
-        {view === "config" && <ConfigView isAdmin={usuario.papel === "admin"} />}
+        {view === "config" && <ConfigView isDono={!!usuario.dono} />}
       </Shell>
 
       {wizardOpen && (

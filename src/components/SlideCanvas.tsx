@@ -40,6 +40,8 @@ export interface InteractiveCtx {
   onPatch: (id: string, patch: Partial<Element>) => void;
   onMoveLogo?: (x: number, y: number) => void; // arrastar o logo cria override no slide
   onMoveCounter?: (x: number, y: number) => void; // arrastar o marcador (global ou override do slide)
+  onCommit?: () => void; // fim do gesto → fecha o passo do histórico (undo desfaz o arraste inteiro)
+  onContextMenu?: (id: string, x: number, y: number) => void; // botão direito num elemento
 }
 
 interface SlideCanvasProps {
@@ -69,11 +71,17 @@ function coverPanTransform(px: number, py: number, zoom: number): string {
   return `translate(${px}%, ${py}%) scale(${s})`;
 }
 
-/** Degradê da base com altura ajustável (scrimPos) + leve escurecida no topo. */
+/**
+ * Degradê da base com altura ajustável (scrimPos).
+ * A partir de ~70% o escurecimento começa a "encher" o slide todo, e em **100%
+ * fica preto sólido** (pedido do Luiz) — abaixo disso o visual segue como antes.
+ */
 function scrimGradient(scrim: number, pos: number): string {
-  const s = scrim / 100;
+  const s = Math.min(1, scrim / 100);
   const start = Math.max(24, 100 - pos); // pos maior = degradê sobe mais
-  return `linear-gradient(180deg, rgba(0,0,0,${s * 0.32}) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) ${start}%, rgba(0,0,0,${s}) 100%)`;
+  const floor = Math.max(0, (s - 0.7) / 0.3); // 0 até 70%; 1 em 100%
+  const top = Math.max(s * 0.32, floor);
+  return `linear-gradient(180deg, rgba(0,0,0,${top}) 0%, rgba(0,0,0,${floor}) 22%, rgba(0,0,0,${floor}) ${start}%, rgba(0,0,0,${s}) 100%)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -559,6 +567,7 @@ function ElementView({ el, slide, kit, carousel, slideIndex, mode, interactive, 
   };
 
   const endPointer = () => {
+    if (dragRef.current) interactive?.onCommit?.(); // fecha o passo do histórico
     dragRef.current = null;
     setGuides({ v: null, h: null });
     document.body.classList.remove("cg-dragging");
@@ -571,6 +580,7 @@ function ElementView({ el, slide, kit, carousel, slideIndex, mode, interactive, 
     width: el.w,
     height: el.h,
     zIndex: el.z,
+    opacity: el.opacity != null ? el.opacity / 100 : undefined,
     transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
     cursor: interactive ? "grab" : undefined,
     outline: selected
@@ -613,6 +623,11 @@ function ElementView({ el, slide, kit, carousel, slideIndex, mode, interactive, 
       onPointerDown={interactive ? (e) => beginPointer(e, "move") : undefined}
       onPointerMove={interactive ? onPointerMove : undefined}
       onPointerUp={interactive ? endPointer : undefined}
+      onContextMenu={
+        interactive?.onContextMenu
+          ? (e) => { e.preventDefault(); e.stopPropagation(); interactive.onSelect(el.id); interactive.onContextMenu!(el.id, e.clientX, e.clientY); }
+          : undefined
+      }
     >
       <ElementContent el={el} slide={slide} kit={kit} slideIndex={slideIndex} mode={mode} />
       {handles}

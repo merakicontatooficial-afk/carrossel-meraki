@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import generateRoutes from "./routes/generate.js";
 import authRoutes from "./routes/auth.js";
+import equipeRoutes from "./routes/equipe.js";
 import dataRoutes, { mediaRouter } from "./routes/data.js";
 import { autenticar } from "./auth.js";
 
@@ -22,6 +23,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);          // login (aberto)
 app.use("/api/media", mediaRouter);         // servir imagens (aberto)
 app.use("/api/generate", autenticar, generateRoutes); // IA (protegida — custa saldo)
+app.use("/api/equipe", equipeRoutes);       // gestão de acessos (só conta dona)
 app.use("/api", dataRoutes);                // carousels/templates/collections/me (protegido)
 
 // erro central

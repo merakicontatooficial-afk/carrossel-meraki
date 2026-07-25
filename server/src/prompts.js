@@ -56,7 +56,13 @@ export function buildSystem(marca) {
     marca.exemplos ? `Exemplos de frases no tom da marca (espelhe o estilo): ${marca.exemplos}.` : "",
     "Português do Brasil.",
   ].filter(Boolean);
-  return `${COPY_EXPERTISE}\n\n${voz.join("\n")}`;
+  // brief = markdown de personalidade/briefing do cliente (cadastrado em Organização).
+  // É a fonte MAIS específica: manda sobre qualquer suposição genérica.
+  const brief = String(marca.brief || "").trim();
+  const briefBloco = brief
+    ? `\n\n--- DOSSIÊ DA MARCA (fonte da verdade — respeite acima de tudo) ---\n${brief.slice(0, 6000)}\n--- fim do dossiê ---`
+    : "";
+  return `${COPY_EXPERTISE}\n\n${voz.join("\n")}${briefBloco}`;
 }
 
 /** Schema de saída para um carrossel inteiro. */

@@ -42,6 +42,7 @@ export interface Element {
   h: number;
   z: number;
   rotation?: number;
+  opacity?: number; // 0–100 (padrão 100) — vale para qualquer elemento
   // text
   role?: TextRole;
   text?: string; // aceita *destaque*, _sublinhado_ e ==realce==
@@ -205,6 +206,8 @@ export interface Collection {
   id: string;
   name: string;
   color: string;
+  /** Markdown com a personalidade/briefing da marca — alimenta a IA na geração. */
+  brief?: string | null;
 }
 
 let counter = 0;

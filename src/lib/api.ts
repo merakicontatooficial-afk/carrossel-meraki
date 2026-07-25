@@ -6,6 +6,8 @@ import { compressCarouselMedia, compressTemplateMedia } from "./imagePrep";
 
 export interface BrandVoice {
   nome?: string;
+  /** dossiê .md da marca (cadastrado em Organização) — contexto forte pra IA */
+  brief?: string;
   nicho?: string;
   tomDeVoz?: string;
   publico?: string;
@@ -32,6 +34,7 @@ export interface Usuario {
   id: number;
   nome: string;
   papel: "admin" | "colaborador";
+  dono?: number; // 1 = conta principal da Meraki (única que gerencia acessos)
 }
 
 // ── token (sessão) ───────────────────────────────────────────────────────────
@@ -108,6 +111,7 @@ export const api = {
   // ── coleções (clientes) ──
   listCollections: () => get<Collection[]>("/api/collections"),
   createCollection: (c: Collection) => post<Collection>("/api/collections", c),
+  updateCollection: (id: string, b: { name?: string; color?: string; brief?: string | null }) => req<Collection>(`/api/collections/${id}`, "PATCH", b),
   deleteCollection: (id: string) => req<{ ok: boolean }>(`/api/collections/${id}`, "DELETE"),
 
   // ── IA (protegida) ──
@@ -129,8 +133,12 @@ export const api = {
   },
   dailyTrends: () => get<{ date: string; items: TrendItem[] }>("/api/generate/trends/daily"),
 
-  // ── acessos (admin) ──
-  listUsers: () => get<{ users: AcessoUser[] }>("/api/users"),
+  // ── acessos / equipe (só conta dona) ──
+  listEquipe: () => get<AcessoUser[]>("/api/equipe"),
+  criarAcesso: (b: { nome: string; email: string; senha: string; papel: string }) => post<AcessoUser>("/api/equipe", b),
+  editarAcesso: (id: number, b: { nome?: string; papel?: string; ativo?: number }) => req<AcessoUser>(`/api/equipe/${id}`, "PATCH", b),
+  resetarSenha: (id: number, senha: string) => post<{ ok: boolean }>(`/api/equipe/${id}/senha`, { senha }),
+  removerAcesso: (id: number) => req<{ ok: boolean }>(`/api/equipe/${id}`, "DELETE"),
 };
 
 export interface TrendItem { titulo: string; categoria?: string; fonte: string; quando: string; resumo: string }

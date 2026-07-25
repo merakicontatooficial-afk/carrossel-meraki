@@ -11,6 +11,7 @@ const FONT_STACKS: Record<string, string> = {
   Syne: '"Syne", system-ui, sans-serif',
   // Tech / geométrica
   "Space Grotesk": '"Space Grotesk", system-ui, sans-serif',
+  "Clash Grotesk": '"Clash Grotesk", "Space Grotesk", system-ui, sans-serif',
   Sora: '"Sora", system-ui, sans-serif',
   // Sans limpa (corpo/UI)
   Poppins: '"Poppins", system-ui, sans-serif',

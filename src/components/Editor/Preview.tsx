@@ -16,6 +16,8 @@ interface Props {
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
   onMoveLogo: (x: number, y: number) => void;
   onMoveCounter: (x: number, y: number) => void;
+  onCommit?: () => void;
+  onContextMenu?: (id: string, x: number, y: number) => void;
 }
 
 export default function Preview({
@@ -30,6 +32,8 @@ export default function Preview({
   onPatchElement,
   onMoveLogo,
   onMoveCounter,
+  onCommit,
+  onContextMenu,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
@@ -51,7 +55,7 @@ export default function Preview({
   if (!slide) return null;
 
   const interactive: InteractiveCtx | undefined = manualMode
-    ? { scale, selectedId, onSelect, onPatch: onPatchElement, onMoveLogo, onMoveCounter }
+    ? { scale, selectedId, onSelect, onPatch: onPatchElement, onMoveLogo, onMoveCounter, onCommit, onContextMenu }
     : undefined;
 
   const prev = () => setIndex(Math.max(0, index - 1));

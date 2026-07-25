@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { BrandKit, Carousel, Element, Slide } from "../../types";
+import { uid } from "../../types";
 import { effectiveColors } from "../../lib/resolve";
 import { autoLayout } from "../../lib/aiCarousel";
 import { cloneSlides } from "../../lib/clone";
 import { exportCarousel } from "../../lib/export";
 import { api } from "../../lib/api";
-import { Btn, ColorInput, Field, NumberInput, Section } from "../ui";
+import { Btn, ColorInput, Field, FileButton, NumberInput, Section } from "../ui";
 import IdentityPanel from "./IdentityPanel";
 import LogoUploader from "./LogoUploader";
 import FramePanel from "./FramePanel";
@@ -38,36 +39,38 @@ export default function Editor({
   const [index, setIndexRaw] = useState(0);
   const [showGrid, setShowGrid] = useState(false);
 
-  // histórico p/ desfazer/refazer — como TODA edição passa por `onChange`, basta
-  // envolver aqui: empilha o estado atual antes de aplicar o próximo.
-  const history = useRef<{ past: Carousel[]; future: Carousel[] }>({ past: [], future: [] });
-  const onChange = (next: Carousel) => {
+  // histórico p/ desfazer/refazer — TODA edição passa por `onChange`.
+  // AGRUPAMENTO (coalescing): um gesto contínuo (arrastar, slider, digitar) dispara
+  // dezenas de onChange. Se a mudança tem a MESMA assinatura da anterior e veio logo
+  // em seguida, NÃO empilhamos de novo — assim Ctrl+Z desfaz o gesto INTEIRO
+  // (de A pra B), não pixel a pixel.
+  const COALESCE_MS = 900;
+  const history = useRef<{ past: Carousel[]; future: Carousel[]; key: string | null; at: number }>({ past: [], future: [], key: null, at: 0 });
+  const onChange = (next: Carousel, coalesceKey?: string) => {
     const h = history.current;
-    h.past.push(carousel);
-    if (h.past.length > 60) h.past.shift();
-    h.future = [];
+    const now = Date.now();
+    const same = !!coalesceKey && h.key === coalesceKey && now - h.at < COALESCE_MS;
+    if (!same) {
+      h.past.push(carousel);
+      if (h.past.length > 80) h.past.shift();
+      h.future = [];
+    }
+    h.key = coalesceKey ?? null;
+    h.at = now;
     applyChange(next);
   };
+  /** fecha o gesto atual: a próxima mudança sempre vira um passo novo no histórico. */
+  const commitHistory = () => { history.current.key = null; };
   const undo = () => {
     const h = history.current;
     const prev = h.past.pop();
-    if (prev) { h.future.push(carousel); applyChange(prev); }
+    if (prev) { h.future.push(carousel); h.key = null; applyChange(prev); }
   };
   const redo = () => {
     const h = history.current;
     const nxt = h.future.pop();
-    if (nxt) { h.past.push(carousel); applyChange(nxt); }
+    if (nxt) { h.past.push(carousel); h.key = null; applyChange(nxt); }
   };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-      else if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); redo(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carousel]);
   const [manualMode, setManualMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
@@ -75,6 +78,8 @@ export default function Editor({
   const [imgPrompt, setImgPrompt] = useState("");
   const [refineInstr, setRefineInstr] = useState("");
   const [caption, setCaption] = useState<string | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [refImg, setRefImg] = useState<string | null>(null); // referência p/ gerar imagem (rosto/produto)
 
   const safeIndex = Math.min(index, carousel.slides.length - 1);
   const slide = carousel.slides[safeIndex];
@@ -85,9 +90,10 @@ export default function Editor({
   };
 
   // --- helpers de atualização imutável ---
+  // a assinatura (slide + campos alterados) agrupa o gesto no histórico
   const patchSlide = (i: number, patch: Partial<Slide>) => {
     const slides = carousel.slides.map((s, j) => (j === i ? { ...s, ...patch } : s));
-    onChange({ ...carousel, slides });
+    onChange({ ...carousel, slides }, `slide:${i}:${Object.keys(patch).join(",")}`);
   };
 
   const patchElement = (elId: string, patch: Partial<Element>) => {
@@ -96,10 +102,53 @@ export default function Editor({
         ? { ...s, elements: s.elements.map((e) => (e.id === elId ? { ...e, ...patch } : e)) }
         : s
     );
-    onChange({ ...carousel, slides });
+    onChange({ ...carousel, slides }, `el:${elId}:${Object.keys(patch).join(",")}`);
   };
 
   const replaceElements = (elements: Element[]) => patchSlide(safeIndex, { elements });
+
+  // --- copiar / colar elementos entre slides (mesma posição) ---
+  const clipboard = useRef<Element | null>(null);
+  const copyElement = (id?: string | null) => {
+    const el = slide.elements.find((e) => e.id === (id ?? selectedId));
+    if (el) clipboard.current = structuredClone(el);
+  };
+  const pasteElement = () => {
+    const src = clipboard.current;
+    if (!src) return;
+    const maxZ = Math.max(0, ...slide.elements.map((e) => e.z));
+    const copy: Element = { ...structuredClone(src), id: uid(), z: maxZ + 1 }; // mesma x/y
+    commitHistory();
+    patchSlide(safeIndex, { elements: [...slide.elements, copy] });
+    setSelectedId(copy.id);
+  };
+  const deleteElement = (id?: string | null) => {
+    const target = id ?? selectedId;
+    if (!target) return;
+    commitHistory();
+    patchSlide(safeIndex, { elements: slide.elements.filter((e) => e.id !== target) });
+    setSelectedId(null);
+  };
+
+  // atalhos: undo/redo + copiar/colar (ignora quando está digitando num campo)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const digitando = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
+      const k = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+      if (mod && k === "y") { e.preventDefault(); redo(); return; }
+      if (digitando) return;
+      if (mod && k === "c") { copyElement(); return; }
+      if (mod && k === "v") { e.preventDefault(); pasteElement(); return; }
+      if (mod && k === "d") { e.preventDefault(); copyElement(); pasteElement(); return; }
+      if ((k === "delete" || k === "backspace") && selectedId) { e.preventDefault(); deleteElement(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carousel, selectedId, safeIndex]);
 
   // --- operações de slide (filmstrip) ---
   const duplicateSlide = (i: number) => {
@@ -153,11 +202,19 @@ export default function Editor({
     body: s.elements.find((e) => e.role === "body")?.text ?? "",
   });
 
+  // referência opcional (rosto/produto) enviada junto com o prompt
+  const refPayload = () => {
+    if (!refImg) return {};
+    const [head, b64] = refImg.split(",");
+    return { refImageBase64: b64, refMime: /data:(.*?);/.exec(head)?.[1] || "image/jpeg" };
+  };
+
   const genImage = async () => {
     setAiBusy("Gerando imagem…");
     try {
       const prompt = imgPrompt.trim() || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt });
+      const img = await api.generateImage({ prompt, ...refPayload() });
+      commitHistory();
       patchSlide(safeIndex, { bgImage: img.dataUrl, bgScale: 1, scrim: slide.scrim ?? 70 });
       setImgPrompt("");
     } catch (e) {
@@ -172,7 +229,8 @@ export default function Editor({
     setAiBusy("Gerando imagem…");
     try {
       const p = (prompt ?? "").trim() || imgPrompt.trim() || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt: p });
+      const img = await api.generateImage({ prompt: p, ...refPayload() });
+      commitHistory();
       patchElement(elId, { src: img.dataUrl });
     } catch (e) {
       alert("Falha ao gerar imagem: " + (e as Error).message);
@@ -256,6 +314,29 @@ export default function Editor({
         </div>
       </header>
 
+      {/* menu do botão direito num elemento */}
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
+          <div className="glass fixed z-[61] w-52 overflow-hidden !rounded-xl py-1 text-sm" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+            {[
+              { label: "Copiar", hint: "Ctrl+C", fn: () => copyElement(ctxMenu.id) },
+              { label: "Colar aqui", hint: "Ctrl+V", fn: pasteElement, off: !clipboard.current },
+              { label: "Duplicar", hint: "Ctrl+D", fn: () => { copyElement(ctxMenu.id); pasteElement(); } },
+            ].map((o) => (
+              <button key={o.label} disabled={o.off} onClick={() => { o.fn(); setCtxMenu(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[var(--text-md)] hover:bg-white/8 hover:text-white disabled:opacity-40">
+                <span className="mr-auto">{o.label}</span>
+                <span className="text-[11px] text-[var(--text-lo)]">{o.hint}</span>
+              </button>
+            ))}
+            <div className="my-1 h-px bg-white/8" />
+            <button onClick={() => { deleteElement(ctxMenu.id); setCtxMenu(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-red-300 hover:bg-red-500/15">
+              <span className="mr-auto">Excluir</span><span className="text-[11px] opacity-60">Del</span>
+            </button>
+          </div>
+        </>
+      )}
+
       {/* modal da legenda gerada */}
       {caption !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setCaption(null)}>
@@ -326,8 +407,22 @@ export default function Editor({
                 className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]"
               />
             </Field>
+            {/* referência de rosto/produto — a IA usa a foto como base */}
+            <div className="mb-3">
+              <div className="mb-1.5 text-xs text-[var(--text-md)]">Imagem de referência — rosto/produto (opcional)</div>
+              {refImg ? (
+                <div className="flex items-center gap-2">
+                  <img src={refImg} alt="referência" className="h-12 w-12 rounded-lg object-cover" />
+                  <FileButton label="Trocar" onFile={setRefImg} />
+                  <Btn variant="danger" onClick={() => setRefImg(null)} title="Remover referência"><X size={13} /></Btn>
+                </div>
+              ) : (
+                <FileButton label={<><ImageIcon size={13} /> Subir referência</>} onFile={setRefImg} />
+              )}
+              <p className="mt-1 text-[11px] text-[var(--text-lo)]">Vale pro fundo e pros cartões de imagem deste slide.</p>
+            </div>
             <button className="btn btn-primary w-full" onClick={genImage} disabled={!!aiBusy}>
-              <ImageIcon size={14} /> Gerar imagem
+              <ImageIcon size={14} /> Gerar imagem de fundo
             </button>
             <div className="my-3 h-px bg-white/8" />
             <Field label="Refinar o título com IA">
@@ -535,6 +630,8 @@ export default function Editor({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onPatchElement={patchElement}
+            onCommit={commitHistory}
+            onContextMenu={(id, x, y) => setCtxMenu({ id, x, y })}
             onMoveLogo={(x, y) =>
               patchSlide(safeIndex, {
                 logoOverride: { ...(slide.logoOverride ?? { show: true }), x, y },

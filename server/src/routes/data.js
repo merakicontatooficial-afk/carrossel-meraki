@@ -5,7 +5,7 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import { existsSync } from "fs";
 import { join } from "path";
-import { db, MEDIA_DIR, getUsersDb } from "../db.js";
+import { db, MEDIA_DIR } from "../db.js";
 import { autenticar } from "../auth.js";
 import { persistMedia, releaseMedia, collectMediaUrls } from "../media.js";
 
@@ -24,27 +24,6 @@ const router = Router();
 router.use(autenticar);
 
 router.get("/me", (req, res) => res.json({ usuario: req.usuario }));
-
-// ===== acessos (quem tem acesso) — só admin, leitura da base do Publisher =====
-router.get("/users", (req, res) => {
-  if (req.usuario?.papel !== "admin") return res.status(403).json({ error: "apenas admin" });
-  const udb = getUsersDb();
-  if (!udb) return res.json({ users: [] });
-  const cols = udb.prepare("PRAGMA table_info(usuarios)").all().map((c) => c.name);
-  const has = (c) => cols.includes(c);
-  const rows = udb.prepare("SELECT * FROM usuarios ORDER BY nome").all();
-  res.json({
-    users: rows.map((u) => ({
-      id: u.id,
-      nome: u.nome,
-      email: u.email,
-      papel: u.papel,
-      ativo: has("ativo") ? (u.ativo ? 1 : 0) : 1,
-      dono: has("dono") ? (u.dono ? 1 : 0) : 0,
-      criadoEm: has("criado_em") ? u.criado_em : has("created_at") ? u.created_at : null,
-    })),
-  });
-});
 
 // ===== carrosséis =====
 router.get("/carousels", (_req, res) => {
@@ -121,14 +100,28 @@ router.delete("/templates/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-// ===== coleções (clientes) =====
+// ===== coleções (clientes) + personalidade da marca (brief .md) =====
 router.get("/collections", (_req, res) => res.json(db.prepare("SELECT * FROM collections ORDER BY name").all()));
 
 router.post("/collections", (req, res) => {
-  const { id, name, color } = req.body || {};
+  const { id, name, color, brief } = req.body || {};
   const cid = id || randomUUID();
-  db.prepare("INSERT OR REPLACE INTO collections (id, name, color) VALUES (?,?,?)").run(cid, name || "Coleção", color || "#5103c1");
-  res.json({ id: cid, name, color });
+  db.prepare("INSERT OR REPLACE INTO collections (id, name, color, brief) VALUES (?,?,?,?)").run(cid, name || "Coleção", color || "#5103c1", brief ?? null);
+  res.json({ id: cid, name, color, brief: brief ?? null });
+});
+
+/** PATCH /collections/:id — atualiza nome/cor/brief (personalidade da marca). */
+router.patch("/collections/:id", (req, res) => {
+  const cur = db.prepare("SELECT * FROM collections WHERE id = ?").get(req.params.id);
+  if (!cur) return res.status(404).json({ error: "coleção não encontrada" });
+  const { name, color, brief } = req.body || {};
+  db.prepare("UPDATE collections SET name = ?, color = ?, brief = ? WHERE id = ?").run(
+    name ?? cur.name,
+    color ?? cur.color,
+    brief !== undefined ? brief : cur.brief,
+    req.params.id
+  );
+  res.json(db.prepare("SELECT * FROM collections WHERE id = ?").get(req.params.id));
 });
 
 router.delete("/collections/:id", (req, res) => {

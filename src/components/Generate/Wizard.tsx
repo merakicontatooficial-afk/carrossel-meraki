@@ -33,6 +33,8 @@ const MODELOS: { id: AiModelo; nome: string; desc: string; preview: "min" | "pro
 
 const FONT_PAIRS: Record<string, { display: string; body: string }> = {
   "Automático (do modelo)": { display: "", body: "" },
+  "Clash + Inter": { display: "Clash Grotesk", body: "Inter" },
+  "Clash + Clash": { display: "Clash Grotesk", body: "Clash Grotesk" },
   "Space + Inter": { display: "Space Grotesk", body: "Inter" },
   "Archivo + Inter": { display: "Archivo Black", body: "Inter" },
   "Anton + DM Sans": { display: "Anton", body: "DM Sans" },
@@ -83,7 +85,8 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const [erro, setErro] = useState<string | null>(null);
   const [trends, setTrends] = useState<{ titulo: string }[] | null>(null);
 
-  const clienteNome = collections.find((c) => c.id === collectionId)?.name;
+  const cliente = collections.find((c) => c.id === collectionId);
+  const clienteNome = cliente?.name;
   const brandName = handle.replace(/^@/, "").trim() || clienteNome || "";
 
   const buscarNoticias = async () => {
@@ -117,7 +120,8 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const gerar = async () => {
     setErro(null);
     try {
-      const marca: BrandVoice | undefined = clienteNome ? { nome: clienteNome } : undefined;
+      // a voz do cliente = nome + DOSSIÊ (.md cadastrado em Organização)
+      const marca: BrandVoice | undefined = clienteNome ? { nome: clienteNome, brief: cliente?.brief ?? undefined } : undefined;
 
       let ai: AiCarousel;
       if (zero) {
