@@ -72,16 +72,20 @@ function coverPanTransform(px: number, py: number, zoom: number): string {
 }
 
 /**
- * Degradê da base com altura ajustável (scrimPos).
- * A partir de ~70% o escurecimento começa a "encher" o slide todo, e em **100%
- * fica preto sólido** (pedido do Luiz) — abaixo disso o visual segue como antes.
+ * Escurecimento do fundo em DUAS camadas independentes (cada uma com seu slider):
+ *  - `scrim`     → intensidade do DEGRADÊ da base (100 = base 100% preta)
+ *  - `scrimPos`  → até onde esse degradê sobe
+ *  - `scrimVeil` → véu UNIFORME sobre a imagem inteira (100 = imagem 100% preta)
+ * As camadas se somam, então dá pra escurecer a foto sem mexer no degradê e vice-versa.
  */
-function scrimGradient(scrim: number, pos: number): string {
-  const s = Math.min(1, scrim / 100);
+function scrimBackground(scrim: number, pos: number, veil: number): string {
+  const s = Math.min(1, Math.max(0, scrim) / 100);
+  const v = Math.min(1, Math.max(0, veil) / 100);
   const start = Math.max(24, 100 - pos); // pos maior = degradê sobe mais
-  const floor = Math.max(0, (s - 0.7) / 0.3); // 0 até 70%; 1 em 100%
+  const floor = Math.max(0, (s - 0.7) / 0.3); // acima de 70% o degradê "enche" o slide
   const top = Math.max(s * 0.32, floor);
-  return `linear-gradient(180deg, rgba(0,0,0,${top}) 0%, rgba(0,0,0,${floor}) 22%, rgba(0,0,0,${floor}) ${start}%, rgba(0,0,0,${s}) 100%)`;
+  const grad = `linear-gradient(180deg, rgba(0,0,0,${top}) 0%, rgba(0,0,0,${floor}) 22%, rgba(0,0,0,${floor}) ${start}%, rgba(0,0,0,${s}) 100%)`;
+  return v > 0 ? `${grad}, linear-gradient(rgba(0,0,0,${v}), rgba(0,0,0,${v}))` : grad;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,12 +154,12 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
           draggable={false}
         />
       )}
-      {slide.bgImage && (slide.scrim ?? 0) > 0 && (
+      {slide.bgImage && ((slide.scrim ?? 0) > 0 || (slide.scrimVeil ?? 0) > 0) && (
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background: scrimGradient(slide.scrim ?? 0, slide.scrimPos ?? 52),
+            background: scrimBackground(slide.scrim ?? 0, slide.scrimPos ?? 52, slide.scrimVeil ?? 0),
             pointerEvents: "none",
           }}
         />

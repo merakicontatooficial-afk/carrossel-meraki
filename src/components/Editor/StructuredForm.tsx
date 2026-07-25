@@ -239,7 +239,19 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide, on
                 Resetar enquadramento
               </button>
             ) : null}
-            <Field label={`Escurecer p/ legibilidade — ${slide.scrim ?? 65}%`}>
+            <div className="mb-1 mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-lo)]">Escurecimento</div>
+            <Field label={`Escurecer a imagem (véu) — ${slide.scrimVeil ?? 0}%`}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={slide.scrimVeil ?? 0}
+                onChange={(e) => onPatchSlide({ scrimVeil: Number(e.target.value) })}
+                className="w-full"
+              />
+              <p className="mt-1 text-[11px] text-[var(--text-lo)]">Escurece a foto INTEIRA por igual. 100% = preto.</p>
+            </Field>
+            <Field label={`Escurecer o degradê da base — ${slide.scrim ?? 65}%`}>
               <input
                 type="range"
                 min={0}
@@ -248,6 +260,7 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide, on
                 onChange={(e) => onPatchSlide({ scrim: Number(e.target.value) })}
                 className="w-full"
               />
+              <p className="mt-1 text-[11px] text-[var(--text-lo)]">Só o degradê de baixo (onde fica o texto). 100% = base preta.</p>
             </Field>
             <Field label={`Altura do degradê da base — ${slide.scrimPos ?? 52}%`}>
               <input

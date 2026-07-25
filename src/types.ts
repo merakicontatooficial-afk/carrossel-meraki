@@ -99,8 +99,9 @@ export interface Slide {
   bgScale?: number; // zoom da foto de fundo (1 = cover; >1 aproxima)
   bgPosX?: number; // pan horizontal em % (-50..50; 0 = centro)
   bgPosY?: number; // pan vertical em %
-  scrim?: number; // 0–100: intensidade do gradiente escuro sobre o fundo (estilo viral)
+  scrim?: number; // 0–100: intensidade do DEGRADÊ da base (100 = base preta)
   scrimPos?: number; // 0–100: altura do degradê da base (quanto sobe); default ~52
+  scrimVeil?: number; // 0–100: véu UNIFORME sobre a imagem toda (100 = imagem preta)
   imgPos?: "top" | "base"; // posição do cartão de imagem no slide (auto-layout)
   logoOverride?: SlideLogoOverride;
   counterOverride?: SlideCounterOverride;
