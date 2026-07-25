@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Collection, Template } from "../../types";
-import { api } from "../../lib/api";
-import { FolderPlus, Trash2, TrendingUp, Settings, LayoutTemplate, Copy, Search, Loader2, Sparkles, ArrowRight } from "lucide-react";
+import { api, type TrendItem, type AcessoUser } from "../../lib/api";
+import { FolderPlus, Trash2, TrendingUp, Settings, LayoutTemplate, Copy, Search, Loader2, Sparkles, ArrowRight, Flame, RefreshCw, Users, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function Placeholder({ icon, title, note }: { icon: ReactNode; title: string; note: string }) {
@@ -18,27 +18,65 @@ export function Placeholder({ icon, title, note }: { icon: ReactNode; title: str
   );
 }
 
-type TrendItem = { titulo: string; fonte: string; quando: string; resumo: string };
+function TrendRow({ t, onCreate }: { t: TrendItem; onCreate: () => void }) {
+  return (
+    <div className="glass flex items-start gap-4 p-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {t.categoria && <span className="rounded-full bg-[var(--brand-sat)]/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--brand-hi)]">{t.categoria}</span>}
+          <span className="text-sm font-semibold text-white">{t.titulo}</span>
+        </div>
+        {t.resumo && <p className="mt-1 text-xs leading-relaxed text-[var(--text-md)]">{t.resumo}</p>}
+        <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--text-lo)]">
+          {t.fonte && <span>{t.fonte}</span>}
+          {t.quando && <span>· {t.quando}</span>}
+        </div>
+      </div>
+      <button className="btn btn-primary shrink-0 !min-h-0 !py-2" onClick={onCreate} title="Gerar carrossel deste tema">
+        <Sparkles size={14} /> Criar <ArrowRight size={13} />
+      </button>
+    </div>
+  );
+}
 
 export function TrendingsView({ onCreateFromTrend }: { onCreateFromTrend: (tema: string) => void }) {
   const [q, setQ] = useState("");
   const [period, setPeriod] = useState("semana");
-  const [items, setItems] = useState<TrendItem[] | null>(null);
+  const [results, setResults] = useState<TrendItem[] | null>(null); // resultado de busca (sobrepõe o diário)
+  const [daily, setDaily] = useState<TrendItem[] | null>(null);
+  const [dailyDate, setDailyDate] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [loadingDaily, setLoadingDaily] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+
+  // "em alta hoje" carrega sozinho ao abrir (cache/dia no servidor)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { date, items } = await api.dailyTrends();
+        setDaily(items);
+        setDailyDate(date);
+      } catch (e) {
+        setErro((e as Error).message);
+      } finally {
+        setLoadingDaily(false);
+      }
+    })();
+  }, []);
 
   const buscar = async () => {
     if (!q.trim()) return;
     setBusy(true);
     setErro(null);
     try {
-      setItems(await api.trends(q, period, 8));
+      setResults(await api.trends(q, period, 8));
     } catch (e) {
       setErro((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
+  const limparBusca = () => { setResults(null); setQ(""); };
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
@@ -46,7 +84,7 @@ export function TrendingsView({ onCreateFromTrend }: { onCreateFromTrend: (tema:
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 text-[var(--brand-hi)]"><TrendingUp size={22} /></div>
         <div>
           <h1 className="text-xl font-bold text-white">Trendings</h1>
-          <p className="text-sm text-[var(--text-md)]">Notícia em alta → carrossel num clique. A busca é ancorada em fontes reais (Google Search).</p>
+          <p className="text-sm text-[var(--text-md)]">O que está em alta no Brasil, atualizado todo dia — ou pesquise um tema. Tudo ancorado em fontes reais.</p>
         </div>
       </div>
 
@@ -57,7 +95,7 @@ export function TrendingsView({ onCreateFromTrend }: { onCreateFromTrend: (tema:
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && buscar()}
-            placeholder="Ex.: marketing para restaurantes, IA no varejo, delivery…"
+            placeholder="Pesquisar um tema específico…"
             className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-white outline-none"
           />
         </div>
@@ -73,35 +111,99 @@ export function TrendingsView({ onCreateFromTrend }: { onCreateFromTrend: (tema:
 
       {erro && <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
 
-      {items === null ? (
-        <p className="py-16 text-center text-sm text-white/45">Busque um tema pra ver o que está em alta agora.</p>
-      ) : items.length === 0 ? (
-        <p className="py-16 text-center text-sm text-white/45">Nada encontrado pra esse tema/período.</p>
+      {results !== null ? (
+        <>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white">Resultados da busca</h2>
+            <button className="text-[12px] text-[var(--brand-hi)] hover:underline" onClick={limparBusca}>← Voltar ao "em alta hoje"</button>
+          </div>
+          {results.length === 0 ? (
+            <p className="py-12 text-center text-sm text-white/45">Nada encontrado pra esse tema/período.</p>
+          ) : (
+            <div className="space-y-3">{results.map((t, i) => <TrendRow key={i} t={t} onCreate={() => onCreateFromTrend(t.titulo)} />)}</div>
+          )}
+        </>
       ) : (
-        <div className="space-y-3">
-          {items.map((t, i) => (
-            <div key={i} className="glass flex items-start gap-4 p-4">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-white">{t.titulo}</div>
-                {t.resumo && <p className="mt-1 text-xs leading-relaxed text-[var(--text-md)]">{t.resumo}</p>}
-                <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--text-lo)]">
-                  {t.fonte && <span>{t.fonte}</span>}
-                  {t.quando && <span>· {t.quando}</span>}
-                </div>
-              </div>
-              <button className="btn btn-primary shrink-0 !min-h-0 !py-2" onClick={() => onCreateFromTrend(t.titulo)} title="Gerar carrossel deste tema">
-                <Sparkles size={14} /> Criar <ArrowRight size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="mb-3 flex items-center gap-2">
+            <Flame size={16} className="text-amber-400" />
+            <h2 className="mr-auto text-sm font-semibold text-white">Em alta hoje {dailyDate && <span className="text-[var(--text-lo)]">· {dailyDate.split("-").reverse().join("/")}</span>}</h2>
+          </div>
+          {loadingDaily ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-[var(--text-md)]"><Loader2 size={16} className="animate-spin" /> Buscando o que está bombando…</div>
+          ) : !daily || daily.length === 0 ? (
+            <p className="py-12 text-center text-sm text-white/45">Não consegui carregar o trending de hoje. Tente uma busca.</p>
+          ) : (
+            <div className="space-y-3">{daily.map((t, i) => <TrendRow key={i} t={t} onCreate={() => onCreateFromTrend(t.titulo)} />)}</div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-export function ConfigView() {
-  return <Placeholder icon={<Settings size={22} />} title="Configurações" note="Perfil da marca, treino de voz por cliente e consumo de IA entram aqui na próxima etapa." />;
+export function ConfigView({ isAdmin }: { isAdmin: boolean }) {
+  const [users, setUsers] = useState<AcessoUser[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [loading, setLoading] = useState(isAdmin);
+
+  const carregar = async () => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const { users } = await api.listUsers();
+      setUsers(users);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { if (isAdmin) carregar(); }, [isAdmin]);
+
+  if (!isAdmin) {
+    return <Placeholder icon={<Settings size={22} />} title="Configurações" note="A gestão de acessos é restrita a administradores. Contas e senhas são as mesmas do Meraki Publisher." />;
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-8 py-8">
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 text-[var(--brand-hi)]"><Users size={22} /></div>
+        <div className="mr-auto">
+          <h1 className="text-xl font-bold text-white">Acessos</h1>
+          <p className="text-sm text-[var(--text-md)]">Quem tem acesso à plataforma (contas compartilhadas com o Meraki Publisher).</p>
+        </div>
+        <button className="btn !min-h-0 !py-2" onClick={carregar} disabled={loading}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Atualizar</button>
+      </div>
+
+      {erro && <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
+
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-16 text-sm text-[var(--text-md)]"><Loader2 size={16} className="animate-spin" /> Carregando…</div>
+      ) : (
+        <div className="glass overflow-hidden">
+          {(users ?? []).map((u, i) => (
+            <div key={u.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? "border-t border-white/8" : ""}`}>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-sat)]/25 text-[13px] font-semibold text-[var(--brand-hi)]">
+                {u.nome?.slice(0, 1).toUpperCase() || "?"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-white">{u.nome}</span>
+                  {u.dono ? <ShieldCheck size={13} className="text-[var(--brand-hi)]" /> : null}
+                </div>
+                <div className="truncate text-[12px] text-[var(--text-lo)]">{u.email}</div>
+              </div>
+              <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-[var(--text-md)]">{u.papel === "admin" ? "Admin" : "Colaborador"}</span>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] ${u.ativo ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-[var(--text-lo)]"}`}>{u.ativo ? "Ativo" : "Inativo"}</span>
+            </div>
+          ))}
+          {(users ?? []).length === 0 && <p className="px-4 py-8 text-center text-sm text-white/45">Nenhum usuário encontrado.</p>}
+        </div>
+      )}
+      <p className="mt-4 text-[12px] text-[var(--text-lo)]">Para criar, editar ou desativar contas, use o Meraki Publisher — as contas são as mesmas nas duas plataformas.</p>
+    </div>
+  );
 }
 
 export function TemplatesView({ templates, onClone, onDelete }: { templates: Template[]; onClone: (id: string) => void; onDelete: (id: string) => void }) {

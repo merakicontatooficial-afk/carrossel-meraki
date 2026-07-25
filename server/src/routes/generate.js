@@ -1,12 +1,30 @@
 // Rotas de IA — proxy fino sobre a camada Gemini.
 import { Router } from "express";
-import { generateJson, generateText, generateImage, fetchTrends, researchTopic } from "../gemini.js";
+import { generateJson, generateText, generateImage, fetchTrends, fetchDailyTrends, researchTopic } from "../gemini.js";
 import { buildSystem, carouselSchema, carouselPrompt } from "../prompts.js";
+import { db } from "../db.js";
 
 const router = Router();
 
 // Envolve handlers async e manda erro pro middleware.
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+// data de HOJE no fuso de São Paulo (YYYY-MM-DD)
+const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/** GET /api/generate/trends/daily → { date, items } — trending do Brasil, cache/dia.
+ *  Atualiza sozinho a cada dia (primeira visita do dia regenera). */
+router.get(
+  "/trends/daily",
+  wrap(async (_req, res) => {
+    const date = hojeSP();
+    const row = db.prepare("SELECT items FROM daily_trends WHERE date = ?").get(date);
+    if (row) return res.json({ date, items: JSON.parse(row.items) });
+    const items = await fetchDailyTrends({ limit: 10 });
+    db.prepare("INSERT OR REPLACE INTO daily_trends (date, items, created_at) VALUES (?,?,?)").run(date, JSON.stringify(items), Date.now());
+    res.json({ date, items });
+  })
+);
 
 /** POST /api/generate/carousel  { tema, nSlides?, modelo? } → { slides[], legenda } */
 router.post(

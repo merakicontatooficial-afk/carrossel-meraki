@@ -324,7 +324,7 @@ export default function App() {
         {view === "organizacao" && (
           <OrganizacaoView collections={collections} counts={counts} onCreate={createCollection} onDelete={deleteCollection} />
         )}
-        {view === "config" && <ConfigView />}
+        {view === "config" && <ConfigView isAdmin={usuario.papel === "admin"} />}
       </Shell>
 
       {wizardOpen && (

@@ -139,3 +139,30 @@ export async function fetchTrends({ query, period = "semana", limit = 8 }) {
     return [];
   }
 }
+
+/**
+ * Trending do dia no Brasil — assuntos MAIS EM ALTA agora (geral: entretenimento,
+ * esporte, cultura pop, tecnologia, celebridades, notícias). Google Search grounding.
+ * Cacheado por dia no banco (ver rota /trends/daily).
+ */
+export async function fetchDailyTrends({ limit = 10 } = {}) {
+  assertKey();
+  const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  const res = await ai.models.generateContent({
+    model: MODELS.text,
+    contents:
+      `Hoje é ${hoje}. Liste os ${limit} ASSUNTOS/NOTÍCIAS MAIS EM ALTA no BRASIL agora — ` +
+      `o que está realmente viralizando e repercutindo (trending). Misture entretenimento, ` +
+      `esporte, cultura pop, tecnologia, celebridades e notícias gerais; priorize o que está ` +
+      `bombando de fato. Para cada um devolva: titulo, categoria (uma palavra), fonte, ` +
+      `quando (ex.: "hoje", "há 2 dias"), resumo (1 frase clara). Responda SOMENTE um array JSON.`,
+    config: { tools: [{ googleSearch: {} }], temperature: 0.5 },
+  });
+  const text = res.text ?? "";
+  const m = text.match(/\[[\s\S]*\]/);
+  try {
+    return m ? JSON.parse(m[0]) : [];
+  } catch {
+    return [];
+  }
+}

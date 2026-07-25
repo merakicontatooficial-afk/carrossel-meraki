@@ -45,6 +45,11 @@ CREATE TABLE IF NOT EXISTS media (
   refcount   INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS daily_trends (
+  date       TEXT PRIMARY KEY,        -- YYYY-MM-DD (fuso America/Sao_Paulo)
+  items      TEXT NOT NULL,           -- JSON [{titulo,categoria,fonte,quando,resumo}]
+  created_at INTEGER NOT NULL
+);
 `);
 
 // Banco de usuários do Publisher — SOMENTE LEITURA (mesmos logins/senhas).

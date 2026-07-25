@@ -124,12 +124,17 @@ export const api = {
     return post<{ legenda: string }>("/api/generate/caption", input);
   },
   async trends(q: string, period = "semana", limit = 8) {
-    const data = await get<{ items: { titulo: string; fonte: string; quando: string; resumo: string }[] }>(
-      `/api/generate/trends?q=${encodeURIComponent(q)}&period=${period}&limit=${limit}`
-    );
+    const data = await get<{ items: TrendItem[] }>(`/api/generate/trends?q=${encodeURIComponent(q)}&period=${period}&limit=${limit}`);
     return data.items;
   },
+  dailyTrends: () => get<{ date: string; items: TrendItem[] }>("/api/generate/trends/daily"),
+
+  // ── acessos (admin) ──
+  listUsers: () => get<{ users: AcessoUser[] }>("/api/users"),
 };
+
+export interface TrendItem { titulo: string; categoria?: string; fonte: string; quando: string; resumo: string }
+export interface AcessoUser { id: number; nome: string; email: string; papel: string; ativo: number; dono: number; criadoEm?: number | string | null }
 
 // tipos auxiliares reexportados p/ quem importa daqui
 export type { BrandKit, Slide };
