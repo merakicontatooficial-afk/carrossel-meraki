@@ -1,0 +1,17 @@
+{
+  "name": "carrossel-meraki-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Backend fino da plataforma de carrosséis da Meraki — auth + proxy Gemini (texto/imagem) + trends. Ver ../BLUEPRINT.md",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}

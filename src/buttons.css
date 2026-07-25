@@ -1,0 +1,90 @@
+/* =========================================================================
+   MERAKI — camada de interação dos botões (cópia canônica do site/CRM)
+   Identidade: pílula de contorno branco sobre preto.
+   · hover  — traço de luz corre pelo contorno; borda de base recua
+   · active — inverte: fundo branco, texto preto
+   · focus  — anel branco visível
+   Aplicar dando a classe .btn-primary (base em index.css) ao botão.
+   ========================================================================= */
+@property --btn-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+:where(.btn-primary, .btn-outline, .btn-inline) { position: relative; }
+
+.btn-primary,
+.btn-outline,
+.btn-inline {
+  isolation: isolate;
+  cursor: pointer;
+  transition: background-color 0.28s ease, color 0.28s ease, border-color 0.4s ease;
+}
+
+.btn-primary::before,
+.btn-outline::before,
+.btn-inline::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--btn-angle),
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(255, 255, 255, 0) 232deg,
+    rgba(255, 255, 255, 0.35) 288deg,
+    #ffffff 340deg,
+    #ffffff 356deg,
+    rgba(255, 255, 255, 0) 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled)::before,
+.btn-outline:hover::before,
+.btn-inline:hover::before,
+.btn-primary:focus-visible::before,
+.btn-outline:focus-visible::before,
+.btn-inline:focus-visible::before {
+  opacity: 1;
+  animation: btn-trace 1.6s linear infinite;
+}
+
+@keyframes btn-trace { to { --btn-angle: 360deg; } }
+
+.btn-primary:hover:not(:disabled),
+.btn-outline:hover,
+.btn-inline:hover { border-color: rgba(255, 255, 255, 0.28); }
+
+.btn-primary:active:not(:disabled),
+.btn-outline:active,
+.btn-inline:active {
+  background-color: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+  transition-duration: 0.06s;
+}
+
+.btn-primary:active::before,
+.btn-outline:active::before,
+.btn-inline:active::before { opacity: 0; animation: none; }
+
+.btn-primary:active svg,
+.btn-inline:active svg { filter: none; }
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.btn-inline:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary::before, .btn-outline::before, .btn-inline::before { animation: none !important; }
+  .btn-primary:hover::before, .btn-outline:hover::before, .btn-inline:hover::before { background: #ffffff; opacity: 1; }
+}

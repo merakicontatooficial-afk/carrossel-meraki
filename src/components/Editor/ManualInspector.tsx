@@ -1,7 +1,7 @@
 import type { ColorToken, Element, Slide } from "../../types";
-import { uid, CANVAS_W, SAFE_MARGIN } from "../../types";
+import { uid, CANVAS_W, CANVAS_H, SAFE_MARGIN } from "../../types";
 import { checkText } from "../../config/guardrails";
-import { Btn, ColorInput, Field, FileButton, NumberInput, Section, Select, TextArea } from "../ui";
+import { Btn, ColorInput, Field, FileButton, SliderField, Section, Select, TextArea } from "../ui";
 import {
   ArrowDown,
   ArrowUp,
@@ -11,6 +11,7 @@ import {
   Heart,
   ImagePlus,
   Minus,
+  Sparkles,
   Square,
   Trash2,
   Type,
@@ -57,10 +58,12 @@ interface Props {
   onSelect: (id: string | null) => void;
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
   onReplaceElements: (elements: Element[]) => void;
+  onGenerateImageEl?: (elId: string) => void;
+  aiBusy?: boolean;
 }
 
 /** Modo Manual: autonomia total sobre o elemento selecionado. Guardrails viram avisos. */
-export default function ManualInspector({ slide, selectedId, onSelect, onPatchElement, onReplaceElements }: Props) {
+export default function ManualInspector({ slide, selectedId, onSelect, onPatchElement, onReplaceElements, onGenerateImageEl, aiBusy }: Props) {
   const el = slide.elements.find((e) => e.id === selectedId) ?? null;
   const sorted = [...slide.elements].sort((a, b) => b.z - a.z);
 
@@ -144,7 +147,7 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                 type="button"
                 onClick={() => onSelect(e.id === selectedId ? null : e.id)}
                 className={`w-full truncate rounded-md px-2 py-1 text-left text-xs ${
-                  e.id === selectedId ? "bg-cyan-500/20 text-cyan-200" : "text-zinc-400 hover:bg-white/5"
+                  e.id === selectedId ? "bg-[var(--brand-sat)]/25 text-white" : "text-[var(--text-md)] hover:bg-white/5"
                 }`}
               >
                 {e.type === "text"
@@ -220,9 +223,6 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                     ]}
                   />
                 </Field>
-                <Field label="Tamanho (px)">
-                  <NumberInput value={el.fontSize ?? 40} min={12} max={300} onChange={(v) => onPatchElement(el.id, { fontSize: v })} />
-                </Field>
                 <Field label="Peso">
                   <Select
                     value={String(el.fontWeight ?? 400)}
@@ -230,13 +230,10 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                     options={["400", "500", "600", "700", "800"].map((w) => ({ value: w, label: w }))}
                   />
                 </Field>
-                <Field label="Entrelinha">
-                  <NumberInput value={el.lineHeight ?? 1.25} min={0.8} max={3} step={0.05} onChange={(v) => onPatchElement(el.id, { lineHeight: v })} />
-                </Field>
-                <Field label="Espaçamento (px)">
-                  <NumberInput value={el.letterSpacing ?? 0} min={-5} max={30} step={0.5} onChange={(v) => onPatchElement(el.id, { letterSpacing: v })} />
-                </Field>
               </div>
+              <SliderField label="Tamanho da fonte (px)" value={el.fontSize ?? 40} min={12} max={300} onChange={(v) => onPatchElement(el.id, { fontSize: v })} />
+              <SliderField label="Entrelinha" value={el.lineHeight ?? 1.25} min={0.8} max={3} step={0.05} onChange={(v) => onPatchElement(el.id, { lineHeight: v })} />
+              <SliderField label="Espaçamento entre letras (px)" value={el.letterSpacing ?? 0} min={-5} max={40} step={0.5} onChange={(v) => onPatchElement(el.id, { letterSpacing: v })} />
               <label className="mb-3 flex items-center gap-2 text-xs text-zinc-300">
                 <input
                   type="checkbox"
@@ -286,12 +283,10 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
           )}
 
           {el.type === "social" && (
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Espaço entre ícones">
-                <NumberInput value={el.gap ?? 48} min={12} max={160} onChange={(v) => onPatchElement(el.id, { gap: v })} />
-              </Field>
+            <>
+              <SliderField label="Espaço entre ícones" value={el.gap ?? 48} min={12} max={160} onChange={(v) => onPatchElement(el.id, { gap: v })} />
               <TokenColorField label="Cor" value={el.color} onChange={(color) => onPatchElement(el.id, { color })} />
-            </div>
+            </>
           )}
 
           {el.type === "image" && (
@@ -304,21 +299,31 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                   </Btn>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Ajuste">
-                  <Select
-                    value={el.fit ?? "cover"}
-                    onChange={(v) => onPatchElement(el.id, { fit: v as Element["fit"] })}
-                    options={[
-                      { value: "cover", label: "Cover (preenche)" },
-                      { value: "contain", label: "Contain (inteira)" },
-                    ]}
-                  />
-                </Field>
-                <Field label="Raio de canto">
-                  <NumberInput value={el.radius ?? 0} min={0} max={200} onChange={(v) => onPatchElement(el.id, { radius: v })} />
-                </Field>
-              </div>
+              {onGenerateImageEl && (
+                <button type="button" onClick={() => onGenerateImageEl(el.id)} disabled={aiBusy} className="btn btn-primary mb-3 w-full !py-2 text-xs">
+                  <Sparkles size={13} /> Gerar imagem com IA
+                </button>
+              )}
+              <Field label="Ajuste">
+                <Select
+                  value={el.fit ?? "cover"}
+                  onChange={(v) => onPatchElement(el.id, { fit: v as Element["fit"] })}
+                  options={[
+                    { value: "cover", label: "Cover (preenche)" },
+                    { value: "contain", label: "Contain (inteira)" },
+                  ]}
+                />
+              </Field>
+              {el.src && (
+                <>
+                  <SliderField label={`Zoom da imagem — ${Math.round((el.imgScale ?? 1) * 100)}%`} value={el.imgScale ?? 1} min={1} max={3} step={0.02} onChange={(v) => onPatchElement(el.id, { imgScale: v })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <SliderField label="Mover ⇆" value={el.imgPosX ?? 0} min={-50} max={50} onChange={(v) => onPatchElement(el.id, { imgPosX: v })} />
+                    <SliderField label="Mover ⇅" value={el.imgPosY ?? 0} min={-50} max={50} onChange={(v) => onPatchElement(el.id, { imgPosY: v })} />
+                  </div>
+                </>
+              )}
+              <SliderField label="Raio de canto" value={el.radius ?? 0} min={0} max={200} onChange={(v) => onPatchElement(el.id, { radius: v })} />
               <label className="mb-3 flex items-center gap-2 text-xs text-zinc-300">
                 <input type="checkbox" checked={el.shadow ?? false} onChange={(e) => onPatchElement(el.id, { shadow: e.target.checked })} />
                 Sombra
@@ -328,39 +333,26 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
 
           {el.type === "shape" && (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Tipo">
-                  <Select
-                    value={el.shape ?? "rect"}
-                    onChange={(v) => onPatchElement(el.id, { shape: v as Element["shape"] })}
-                    options={[
-                      { value: "rect", label: "Retângulo" },
-                      { value: "line", label: "Linha" },
-                    ]}
-                  />
-                </Field>
-                <Field label="Raio">
-                  <NumberInput value={el.radius2 ?? 0} min={0} max={200} onChange={(v) => onPatchElement(el.id, { radius2: v })} />
-                </Field>
-              </div>
+              <Field label="Tipo">
+                <Select
+                  value={el.shape ?? "rect"}
+                  onChange={(v) => onPatchElement(el.id, { shape: v as Element["shape"] })}
+                  options={[
+                    { value: "rect", label: "Retângulo" },
+                    { value: "line", label: "Linha" },
+                  ]}
+                />
+              </Field>
+              <SliderField label="Raio de canto" value={el.radius2 ?? 0} min={0} max={200} onChange={(v) => onPatchElement(el.id, { radius2: v })} />
               <TokenColorField label="Preenchimento" value={el.fill} onChange={(fill) => onPatchElement(el.id, { fill })} />
             </>
           )}
 
-          <div className="grid grid-cols-4 gap-2">
-            <Field label="X">
-              <NumberInput value={el.x} onChange={(v) => onPatchElement(el.id, { x: v })} />
-            </Field>
-            <Field label="Y">
-              <NumberInput value={el.y} onChange={(v) => onPatchElement(el.id, { y: v })} />
-            </Field>
-            <Field label="L">
-              <NumberInput value={el.w} min={20} onChange={(v) => onPatchElement(el.id, { w: v })} />
-            </Field>
-            <Field label="A">
-              <NumberInput value={el.h} min={20} onChange={(v) => onPatchElement(el.id, { h: v })} />
-            </Field>
-          </div>
+          <div className="mb-1 mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Posição & Tamanho</div>
+          <SliderField label="Posição X" value={el.x} min={-200} max={CANVAS_W} onChange={(v) => onPatchElement(el.id, { x: v })} />
+          <SliderField label="Posição Y" value={el.y} min={-200} max={CANVAS_H} onChange={(v) => onPatchElement(el.id, { y: v })} />
+          <SliderField label="Largura" value={el.w} min={20} max={CANVAS_W} onChange={(v) => onPatchElement(el.id, { w: v })} />
+          <SliderField label="Altura" value={el.h} min={20} max={CANVAS_H} onChange={(v) => onPatchElement(el.id, { h: v })} />
 
           <Field label="Camada">
             <div className="flex gap-1">
@@ -380,9 +372,7 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
             </div>
           </Field>
 
-          <Field label="Rotação (graus)">
-            <NumberInput value={el.rotation ?? 0} min={-180} max={180} onChange={(v) => onPatchElement(el.id, { rotation: v })} />
-          </Field>
+          <SliderField label="Rotação (graus)" value={el.rotation ?? 0} min={-180} max={180} onChange={(v) => onPatchElement(el.id, { rotation: v })} />
         </Section>
       )}
     </>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { BrandKit, Carousel, Element } from "../../types";
-import { CANVAS_H, CANVAS_W } from "../../types";
+import { CANVAS_H, CANVAS_W, SAFE_MARGIN } from "../../types";
 import SlideCanvas, { type InteractiveCtx } from "../SlideCanvas";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -10,6 +10,7 @@ interface Props {
   index: number;
   setIndex: (i: number) => void;
   manualMode: boolean;
+  showGrid?: boolean;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
@@ -23,6 +24,7 @@ export default function Preview({
   index,
   setIndex,
   manualMode,
+  showGrid,
   selectedId,
   onSelect,
   onPatchElement,
@@ -68,7 +70,7 @@ export default function Preview({
             flexShrink: 0,
           }}
         >
-          <div style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: CANVAS_W, height: CANVAS_H }}>
+          <div style={{ position: "relative", transform: `scale(${scale})`, transformOrigin: "top left", width: CANVAS_W, height: CANVAS_H }}>
             <SlideCanvas
               slide={slide}
               kit={kit}
@@ -77,6 +79,17 @@ export default function Preview({
               mode={manualMode ? "edit" : "preview"}
               interactive={interactive}
             />
+            {showGrid && (
+              <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 600 }}>
+                {[SAFE_MARGIN, CANVAS_W / 3, CANVAS_W / 2, (2 * CANVAS_W) / 3, CANVAS_W - SAFE_MARGIN].map((x, i) => (
+                  <div key={"v" + i} style={{ position: "absolute", left: x, top: 0, bottom: 0, width: x === CANVAS_W / 2 ? 2 : 1, background: x === CANVAS_W / 2 ? "rgba(34,211,238,0.5)" : "rgba(255,255,255,0.14)" }} />
+                ))}
+                {[SAFE_MARGIN, CANVAS_H / 3, CANVAS_H / 2, (2 * CANVAS_H) / 3, CANVAS_H - SAFE_MARGIN].map((y, i) => (
+                  <div key={"h" + i} style={{ position: "absolute", top: y, left: 0, right: 0, height: y === CANVAS_H / 2 ? 2 : 1, background: y === CANVAS_H / 2 ? "rgba(34,211,238,0.5)" : "rgba(255,255,255,0.14)" }} />
+                ))}
+                <div style={{ position: "absolute", left: SAFE_MARGIN, top: SAFE_MARGIN, right: SAFE_MARGIN, bottom: SAFE_MARGIN, border: "1px dashed rgba(34,211,238,0.4)" }} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -104,7 +117,7 @@ export default function Preview({
             key={s.id}
             type="button"
             onClick={() => setIndex(i)}
-            className={`h-2 rounded-full transition-all ${i === index ? "w-5 bg-violet-400" : "w-2 bg-white/20 hover:bg-white/40"}`}
+            className={`h-2 rounded-full transition-all ${i === index ? "w-5 bg-[var(--brand-hi)]" : "w-2 bg-white/20 hover:bg-white/40"}`}
           />
         ))}
         <span className="ml-3 text-[11px] tabular-nums text-zinc-500">

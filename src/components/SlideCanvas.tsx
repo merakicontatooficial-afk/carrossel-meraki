@@ -62,6 +62,20 @@ function snapTo(value: number, guides: number[], threshold: number): { value: nu
   return { value, guide: null };
 }
 
+/** Pan (translate%) + escala mínima que mantém cobertura total ao mover em qualquer eixo. */
+function coverPanTransform(px: number, py: number, zoom: number): string {
+  const need = 1 + (2 * Math.max(Math.abs(px), Math.abs(py))) / 100; // sem revelar borda
+  const s = Math.max(zoom || 1, need);
+  return `translate(${px}%, ${py}%) scale(${s})`;
+}
+
+/** Degradê da base com altura ajustável (scrimPos) + leve escurecida no topo. */
+function scrimGradient(scrim: number, pos: number): string {
+  const s = scrim / 100;
+  const start = Math.max(24, 100 - pos); // pos maior = degradê sobe mais
+  return `linear-gradient(180deg, rgba(0,0,0,${s * 0.32}) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) ${start}%, rgba(0,0,0,${s}) 100%)`;
+}
+
 // ---------------------------------------------------------------------------
 
 export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, interactive }: SlideCanvasProps) {
@@ -120,8 +134,10 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            objectPosition: `${50 + (slide.bgPosX ?? 0)}% ${50 + (slide.bgPosY ?? 0)}%`,
-            transform: slide.bgScale && slide.bgScale !== 1 ? `scale(${slide.bgScale})` : undefined,
+            // pan via translate% + escala automática que garante cobertura em AMBOS
+            // os eixos (⇆ e ⇅ sempre funcionam, sem revelar borda). Zoom soma por cima.
+            transform: coverPanTransform(slide.bgPosX ?? 0, slide.bgPosY ?? 0, slide.bgScale ?? 1),
+            transformOrigin: "center",
           }}
           draggable={false}
         />
@@ -131,7 +147,7 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
           style={{
             position: "absolute",
             inset: 0,
-            background: `linear-gradient(180deg, rgba(0,0,0,${((slide.scrim ?? 0) / 100) * 0.45}) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 48%, rgba(0,0,0,${(slide.scrim ?? 0) / 100}) 90%)`,
+            background: scrimGradient(slide.scrim ?? 0, slide.scrimPos ?? 52),
             pointerEvents: "none",
           }}
         />
@@ -672,19 +688,30 @@ function ElementContent({
         </div>
       );
     }
+    const panned = (el.imgPosX ?? 0) !== 0 || (el.imgPosY ?? 0) !== 0 || (el.imgScale ?? 1) !== 1;
     return (
-      <img
-        src={el.src}
-        alt=""
-        draggable={false}
+      <div
         style={{
           width: "100%",
           height: "100%",
-          objectFit: el.fit ?? "cover",
+          overflow: "hidden",
           borderRadius: el.radius ?? 0,
           boxShadow: el.shadow ? "0 24px 60px rgba(0,0,0,0.45)" : undefined,
         }}
-      />
+      >
+        <img
+          src={el.src}
+          alt=""
+          draggable={false}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: el.fit ?? "cover",
+            transform: panned ? coverPanTransform(el.imgPosX ?? 0, el.imgPosY ?? 0, el.imgScale ?? 1) : undefined,
+            transformOrigin: "center",
+          }}
+        />
+      </div>
     );
   }
 

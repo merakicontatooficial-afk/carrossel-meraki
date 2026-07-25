@@ -38,7 +38,7 @@ export default function IdentityPanel({ kit, onUpdateKit }: Props) {
   const fontOptions = AVAILABLE_FONTS.map((f) => ({ value: f, label: f }));
 
   return (
-    <Section title="Identidade (cores e fontes)">
+    <Section title="Cores & Tipografia" icon={<Palette size={15} />}>
       <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1.5">
         <Swatch color={kit.bg} label="fundo" />
         <Swatch color={kit.text} label="texto" />

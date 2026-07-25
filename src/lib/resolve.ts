@@ -1,14 +1,26 @@
 import type { BrandKit, ColorToken, FontRole, Slide } from "../types";
 
-// Stacks CSS reais das fontes empacotadas via @fontsource
+// Stacks CSS reais das fontes empacotadas via @fontsource.
+// Adicionar fonte aqui + importar os pesos em src/main.tsx = fica disponível
+// no seletor de todas as marcas/clientes.
 const FONT_STACKS: Record<string, string> = {
+  // Display pesado / uppercase viral
   "Archivo Black": '"Archivo Black", "Inter", system-ui, sans-serif',
-  Fraunces: '"Fraunces", Georgia, serif',
+  Anton: '"Anton", "Archivo Black", system-ui, sans-serif',
+  "Bebas Neue": '"Bebas Neue", "Anton", system-ui, sans-serif',
   Syne: '"Syne", system-ui, sans-serif',
-  "DM Sans": '"DM Sans", system-ui, sans-serif',
-  "Space Mono": '"Space Mono", ui-monospace, monospace',
+  // Tech / geométrica
+  "Space Grotesk": '"Space Grotesk", system-ui, sans-serif',
+  Sora: '"Sora", system-ui, sans-serif',
+  // Sans limpa (corpo/UI)
   Poppins: '"Poppins", system-ui, sans-serif',
   Inter: '"Inter", system-ui, sans-serif',
+  "DM Sans": '"DM Sans", system-ui, sans-serif',
+  Manrope: '"Manrope", system-ui, sans-serif',
+  // Editorial / serifa
+  Fraunces: '"Fraunces", Georgia, serif',
+  // Mono
+  "Space Mono": '"Space Mono", ui-monospace, monospace',
 };
 
 export const AVAILABLE_FONTS = Object.keys(FONT_STACKS);

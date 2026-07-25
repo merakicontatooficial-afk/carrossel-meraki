@@ -61,6 +61,9 @@ export interface Element {
   fit?: "cover" | "contain";
   radius?: number;
   shadow?: boolean;
+  imgScale?: number; // zoom da imagem dentro do quadro (1 = cover; >1 aproxima)
+  imgPosX?: number; // pan horizontal em % (-50..50; 0 = centro)
+  imgPosY?: number; // pan vertical em %
   // shape
   shape?: "rect" | "line";
   fill?: ColorToken;
@@ -95,7 +98,9 @@ export interface Slide {
   bgScale?: number; // zoom da foto de fundo (1 = cover; >1 aproxima)
   bgPosX?: number; // pan horizontal em % (-50..50; 0 = centro)
   bgPosY?: number; // pan vertical em %
-  scrim?: number; // 0–100: gradiente escuro de baixo pra cima sobre o fundo (estilo viral)
+  scrim?: number; // 0–100: intensidade do gradiente escuro sobre o fundo (estilo viral)
+  scrimPos?: number; // 0–100: altura do degradê da base (quanto sobe); default ~52
+  imgPos?: "top" | "base"; // posição do cartão de imagem no slide (auto-layout)
   logoOverride?: SlideLogoOverride;
   counterOverride?: SlideCounterOverride;
   colors: SlideColors;

@@ -1,0 +1,97 @@
+// Prompts e schemas — conhecimento de marca/copy da Meraki e dos 4 modelos.
+// Regras de voz vindas de marcas/meraki/identidade.md §7.
+
+export const MODELOS = {
+  minimalista: "Minimalista: headline grande em caixa alta, foco em informação densa e clara, corpo curto.",
+  profile: "Profile: estilo tweet/X — nome + @ + selo + texto de opinião/autoridade, tom pessoal.",
+  creators: "Creators: marca pessoal/lifestyle, linguagem próxima, energia de criador de conteúdo.",
+  techviral: "Tech Viral: notícia de tecnologia/lançamento, tom arrojado, urgência e novidade.",
+};
+
+// ── Núcleo de expertise: a IA age como COPYWRITER ESPECIALISTA em conteúdo
+// viral de carrossel. Vale para TODA geração, independente do cliente.
+export const COPY_EXPERTISE = `Você é um copywriter sênior especialista em conteúdo de carrossel para Instagram,
+com domínio de copywriting de resposta direta e das mecânicas de engajamento das redes.
+Seu trabalho não é "escrever bonito" — é fazer a pessoa PARAR o scroll, deslizar até o fim e AGIR.
+
+PRINCÍPIOS QUE VOCÊ SEMPRE APLICA:
+- CAPA (slide 1) é 80% do resultado: um gancho que abre um "gap de curiosidade" ou promete um ganho claro
+  em ≤ 10 palavras. Use uma destas alavancas: número específico, erro comum, contradição, resultado concreto,
+  pergunta que cutuca a dor. Nunca uma capa morna ou descritiva.
+- ESPECIFICIDADE vence generalidade: número, prazo, exemplo real > adjetivo vago. "Em 30 dias", "3 erros",
+  "R$ 2 mil/mês" > "muito", "vários", "rápido".
+- UMA ideia por slide. Corte tudo que não empurra pro próximo slide. Frase curta, ritmo de leitura rápido.
+- Cada slide de valor entrega algo ÚTIL de imediato (um insight aplicável), embasado nos dados fornecidos.
+- Progressão: gancho → tensão/porquê → virada/como → prova → CTA. O penúltimo slide amarra, o último converte.
+- CTA final = engajamento (salvar, comentar uma palavra, enviar para alguém), não "chame no direct".
+- Headline afiada + subheadline que complementa (não repete). A subheadline entrega o benefício ou a prova.
+- ZERO clichê de IA: nada de "descubra", "imagine", "no mundo de hoje", "cada vez mais", "o segredo que ninguém conta"
+  batido. Se soa como legenda automática, reescreva.
+- Escreva como gente fala, com autoridade. Sem enrolação, sem encher linguiça pra bater a contagem de slides.`;
+
+// Voz PADRÃO da agência (fallback quando o carrossel não é de um cliente específico).
+export const SYSTEM_MERAKI = `${COPY_EXPERTISE}
+
+Nesta peça você escreve pela Meraki (agência de marketing digital).
+Voz: confiante, direta, sofisticada, com calor humano.
+USE o vocabulário: clareza, estratégia, resultado, crescimento, propósito, dados, impacto.
+EVITE: "inovador", "disruptivo", "soluções completas", "ecossistema", "transformação digital".
+Português do Brasil.`;
+
+/**
+ * Monta a instrução de sistema para a marca do CLIENTE.
+ * A plataforma é multi-cliente: a Merali opera, mas o carrossel veste a marca do
+ * cliente. `marca` = { nome, nicho, tomDeVoz, usar, evitar, publico, exemplos }.
+ * Sem `marca`, cai na voz da própria Meraki.
+ */
+export function buildSystem(marca) {
+  if (!marca || !marca.nome) return SYSTEM_MERAKI;
+  // A expertise de copy é a base; a voz do cliente é a camada por cima.
+  const voz = [
+    `Nesta peça você escreve PELA marca "${marca.nome}"${marca.nicho ? ` (nicho: ${marca.nicho})` : ""} — incorpore a voz dela.`,
+    marca.tomDeVoz ? `Tom de voz da marca: ${marca.tomDeVoz}.` : "Tom: claro, direto e humano, coerente com o nicho da marca.",
+    marca.publico ? `Público-alvo: ${marca.publico} — fale a língua dessa pessoa.` : "",
+    marca.usar ? `Vocabulário a USAR: ${marca.usar}.` : "",
+    marca.evitar ? `Vocabulário/temas a EVITAR: ${marca.evitar}.` : "",
+    marca.exemplos ? `Exemplos de frases no tom da marca (espelhe o estilo): ${marca.exemplos}.` : "",
+    "Português do Brasil.",
+  ].filter(Boolean);
+  return `${COPY_EXPERTISE}\n\n${voz.join("\n")}`;
+}
+
+/** Schema de saída para um carrossel inteiro. */
+export const carouselSchema = {
+  type: "object",
+  properties: {
+    legenda: { type: "string", description: "Legenda do post pronta, com CTA no fim." },
+    slides: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: ["cover", "value", "proof", "cta"] },
+          eyebrow: { type: "string", description: "@handle, categoria ou linha de apoio curta" },
+          headline: { type: "string", description: "Título do slide; pode usar *destaque* e ==realce==" },
+          body: { type: "string", description: "Corpo curto (pode ser vazio na capa)" },
+        },
+        required: ["kind", "headline"],
+      },
+    },
+  },
+  required: ["slides"],
+};
+
+const IDIOMAS = { "pt-BR": "Português do Brasil", "en": "inglês", "es": "espanhol" };
+
+export function carouselPrompt({ tema, nSlides, modelo, briefing, idioma }) {
+  const desc = MODELOS[modelo] || MODELOS.minimalista;
+  const lang = IDIOMAS[idioma] || IDIOMAS["pt-BR"];
+  const contexto = briefing
+    ? `\n\nUse ESTES FATOS pesquisados como base (cite números/exemplos concretos, não fique genérico):\n${briefing}\n`
+    : "";
+  return `Crie um carrossel de Instagram com EXATAMENTE ${nSlides} slides sobre: "${tema}". Escreva TODO o conteúdo em ${lang}.
+Estilo do modelo escolhido — ${desc}${contexto}
+Estrutura: 1º slide = capa (gancho forte), slides do meio = valor/prova (com dados concretos), último = CTA de engajamento.
+Cada slide: headline afiada + corpo curto e específico. Marque palavras-chave com *destaque* e no máximo uma com ==realce== por slide.
+Também escreva a "legenda" do post (2-4 linhas + CTA de engajamento no fim).`;
+}

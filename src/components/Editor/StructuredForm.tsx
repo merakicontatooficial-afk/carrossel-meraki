@@ -1,8 +1,8 @@
 import type { Element, Slide, TextRole } from "../../types";
 import { checkText } from "../../config/guardrails";
 import { ACTION_PRESETS, SWIPE_PRESETS, clampCtaY, type CtaPreset } from "../../config/cta";
-import { Field, FileButton, Section, Select, TextArea, Btn } from "../ui";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { Field, FileButton, Section, Select, TextArea, Btn, SliderField } from "../ui";
+import { ImagePlus, Trash2, Type, Image as ImageIcon, MousePointerClick, Sparkles, AlignVerticalSpaceAround, ArrowUpToLine, ArrowDownToLine } from "lucide-react";
 
 const ROLE_LABELS: Record<TextRole, string> = {
   eyebrow: "Eyebrow",
@@ -18,6 +18,9 @@ interface Props {
   slide: Slide;
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
   onPatchSlide: (patch: Partial<Slide>) => void;
+  onGenerateImageEl?: (elId: string) => void;
+  onAutoLayout?: (imgPos?: "top" | "base") => void;
+  aiBusy?: boolean;
 }
 
 /**
@@ -31,7 +34,7 @@ function presetMatch(el: Element, presets: CtaPreset[]): string {
   return found?.id ?? "";
 }
 
-export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: Props) {
+export default function StructuredForm({ slide, onPatchElement, onPatchSlide, onGenerateImageEl, onAutoLayout, aiBusy }: Props) {
   const textEls = slide.elements
     .filter((e) => e.type === "text" && e.role !== "logo" && e.role !== "index")
     .sort((a, b) => a.y - b.y);
@@ -48,7 +51,7 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
 
   return (
     <>
-      <Section title="Textos do slide">
+      <Section title="Texto & IA" icon={<Type size={15} />} defaultOpen>
         {textEls.length === 0 && <p className="text-xs text-zinc-500">Este slide não tem textos editáveis.</p>}
         {textEls.map((el) => {
           const check = checkText(el.role, el.text ?? "");
@@ -86,24 +89,65 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
       </Section>
 
       {imageEls.length > 0 && (
-        <Section title="Imagens">
+        <Section title="Cartão de Imagem" icon={<ImageIcon size={15} />} defaultOpen>
+          {/* posição do cartão + reorganização automática do slide */}
+          {onAutoLayout && (
+            <div className="mb-3">
+              <div className="mb-1 text-xs text-[var(--text-md)]">Posição da imagem no slide</div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onAutoLayout("top")}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs ${slide.imgPos === "top" ? "border-[var(--brand-sat)] bg-[var(--brand-sat)]/15 text-white" : "border-white/10 text-[var(--text-md)] hover:text-white"}`}
+                >
+                  <ArrowUpToLine size={13} /> Topo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAutoLayout("base")}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs ${(slide.imgPos ?? "base") === "base" ? "border-[var(--brand-sat)] bg-[var(--brand-sat)]/15 text-white" : "border-white/10 text-[var(--text-md)] hover:text-white"}`}
+                >
+                  <ArrowDownToLine size={13} /> Base
+                </button>
+              </div>
+              <button type="button" onClick={() => onAutoLayout()} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 px-2 py-2 text-xs text-[var(--text-md)] hover:text-white">
+                <AlignVerticalSpaceAround size={13} /> Auto-organizar layout
+              </button>
+            </div>
+          )}
           {imageEls.map((el, i) => (
-            <div key={el.id} className="mb-2 flex items-center gap-2">
-              {el.src ? (
-                <img src={el.src} alt="" className="h-10 w-14 rounded object-cover" />
-              ) : (
-                <div className="flex h-10 w-14 items-center justify-center rounded border border-dashed border-white/15 text-zinc-500">
-                  <ImagePlus size={14} />
-                </div>
+            <div key={el.id} className="mb-3 rounded-lg border border-white/8 p-2">
+              <div className="mb-2 flex items-center gap-2">
+                {el.src ? (
+                  <img src={el.src} alt="" className="h-10 w-14 rounded object-cover" />
+                ) : (
+                  <div className="flex h-10 w-14 items-center justify-center rounded border border-dashed border-white/15 text-zinc-500">
+                    <ImagePlus size={14} />
+                  </div>
+                )}
+                <FileButton
+                  label={el.src ? `Trocar ${imageEls.length > 1 ? i + 1 : ""}` : "Subir imagem"}
+                  onFile={(src) => onPatchElement(el.id, { src })}
+                />
+                {el.src && (
+                  <Btn variant="danger" onClick={() => onPatchElement(el.id, { src: undefined })} title="Remover">
+                    <Trash2 size={13} />
+                  </Btn>
+                )}
+              </div>
+              {onGenerateImageEl && (
+                <button type="button" onClick={() => onGenerateImageEl(el.id)} disabled={aiBusy} className="btn btn-primary mb-2 w-full !py-2 text-xs">
+                  <Sparkles size={13} /> Gerar imagem com IA
+                </button>
               )}
-              <FileButton
-                label={el.src ? `Trocar imagem ${imageEls.length > 1 ? i + 1 : ""}` : "Subir imagem"}
-                onFile={(src) => onPatchElement(el.id, { src })}
-              />
               {el.src && (
-                <Btn variant="danger" onClick={() => onPatchElement(el.id, { src: undefined })} title="Remover">
-                  <Trash2 size={13} />
-                </Btn>
+                <>
+                  <SliderField label={`Zoom — ${Math.round((el.imgScale ?? 1) * 100)}%`} value={el.imgScale ?? 1} min={1} max={3} step={0.02} onChange={(v) => onPatchElement(el.id, { imgScale: v })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <SliderField label="Mover ⇆" value={el.imgPosX ?? 0} min={-50} max={50} onChange={(v) => onPatchElement(el.id, { imgPosX: v })} />
+                    <SliderField label="Mover ⇅" value={el.imgPosY ?? 0} min={-50} max={50} onChange={(v) => onPatchElement(el.id, { imgPosY: v })} />
+                  </div>
+                </>
               )}
             </div>
           ))}
@@ -111,7 +155,7 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
       )}
 
       {ctaEls.length > 0 && (
-        <Section title="Botão / CTA">
+        <Section title="Botão / CTA" icon={<MousePointerClick size={15} />}>
           {ctaEls.map((el) => {
             const isSwipe = el.role === "cta-secondary";
             const presets = isSwipe ? SWIPE_PRESETS : ACTION_PRESETS;
@@ -138,7 +182,7 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
         </Section>
       )}
 
-      <Section title="Fundo do slide">
+      <Section title="Imagem de Fundo" icon={<ImageIcon size={15} />}>
         <div className="flex items-center gap-2">
           {slide.bgImage && <img src={slide.bgImage} alt="" className="h-10 w-14 rounded object-cover" />}
           <FileButton
@@ -202,6 +246,16 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide }: 
                 max={100}
                 value={slide.scrim ?? 65}
                 onChange={(e) => onPatchSlide({ scrim: Number(e.target.value) })}
+                className="w-full"
+              />
+            </Field>
+            <Field label={`Altura do degradê da base — ${slide.scrimPos ?? 52}%`}>
+              <input
+                type="range"
+                min={0}
+                max={90}
+                value={slide.scrimPos ?? 52}
+                onChange={(e) => onPatchSlide({ scrimPos: Number(e.target.value) })}
                 className="w-full"
               />
             </Field>

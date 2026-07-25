@@ -1,5 +1,6 @@
 import type { CarouselCounter, CounterPos, CounterStyle } from "../../types";
 import { Field, Section, Select } from "../ui";
+import { Hash } from "lucide-react";
 
 interface Props {
   counter: CarouselCounter | undefined;
@@ -16,7 +17,7 @@ export default function CounterPanel({ counter, onChange }: Props) {
   };
 
   return (
-    <Section title="Contador de slides">
+    <Section title="Marcador de Slides" icon={<Hash size={15} />}>
       <Field label="Estilo">
         <Select
           value={counter?.style ?? "none"}

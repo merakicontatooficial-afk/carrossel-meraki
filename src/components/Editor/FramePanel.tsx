@@ -1,6 +1,6 @@
 import type { CarouselFrame } from "../../types";
 import { Btn, Field, FileButton, Section } from "../ui";
-import { Trash2 } from "lucide-react";
+import { Trash2, Frame } from "lucide-react";
 
 interface Props {
   frame: CarouselFrame | undefined;
@@ -21,7 +21,7 @@ export default function FramePanel({ frame, onChange }: Props) {
   };
 
   return (
-    <Section title="PNG sobreposto (topo/base)">
+    <Section title="Moldura (PNG topo/base)" icon={<Frame size={15} />}>
       <div className="space-y-3">
         <div>
           <div className="mb-1.5 flex items-center gap-2">

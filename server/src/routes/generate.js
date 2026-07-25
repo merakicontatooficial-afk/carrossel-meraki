@@ -1,0 +1,86 @@
+// Rotas de IA — proxy fino sobre a camada Gemini.
+import { Router } from "express";
+import { generateJson, generateText, generateImage, fetchTrends, researchTopic } from "../gemini.js";
+import { buildSystem, carouselSchema, carouselPrompt } from "../prompts.js";
+
+const router = Router();
+
+// Envolve handlers async e manda erro pro middleware.
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+/** POST /api/generate/carousel  { tema, nSlides?, modelo? } → { slides[], legenda } */
+router.post(
+  "/carousel",
+  wrap(async (req, res) => {
+    const { tema, nSlides = 6, modelo = "minimalista", marca, idioma = "pt-BR" } = req.body || {};
+    if (!tema || !String(tema).trim()) {
+      return res.status(400).json({ error: "Informe o 'tema' do carrossel." });
+    }
+    const n = Math.max(3, Math.min(20, Number(nSlides) || 6));
+    // 1) pesquisa fatos reais na web (grounding) → 2) escreve o carrossel embasado
+    const briefing = await researchTopic(tema);
+    const data = await generateJson({
+      system: buildSystem(marca), // voz do CLIENTE (fallback = voz da Meraki)
+      schema: carouselSchema,
+      prompt: carouselPrompt({ tema, nSlides: n, modelo, briefing, idioma }),
+    });
+    res.json(data);
+  })
+);
+
+/** POST /api/generate/image  { prompt, refImageBase64?, refMime?, hq? } → { dataUrl, model } */
+router.post(
+  "/image",
+  wrap(async (req, res) => {
+    const { prompt, refImageBase64, refMime, hq = false } = req.body || {};
+    if (!prompt || !String(prompt).trim()) {
+      return res.status(400).json({ error: "Informe o 'prompt' da imagem." });
+    }
+    const out = await generateImage({ prompt, refImageBase64, refMime, hq: !!hq });
+    res.json(out);
+  })
+);
+
+/** POST /api/refine/slide  { texto, instrucao } → { texto } */
+router.post(
+  "/refine",
+  wrap(async (req, res) => {
+    const { texto, instrucao, marca } = req.body || {};
+    if (!texto || !instrucao) {
+      return res.status(400).json({ error: "Informe 'texto' e 'instrucao'." });
+    }
+    const out = await generateText({
+      system: buildSystem(marca),
+      prompt: `Reescreva o texto abaixo seguindo a instrução. Devolva SÓ o texto novo, sem aspas.\n\nInstrução: ${instrucao}\n\nTexto:\n${texto}`,
+    });
+    res.json({ texto: out });
+  })
+);
+
+/** POST /api/generate/caption  { tema, slides? } → { legenda } */
+router.post(
+  "/caption",
+  wrap(async (req, res) => {
+    const { tema, slides, marca } = req.body || {};
+    const base = tema || (Array.isArray(slides) ? slides.map((s) => s.headline).join(" / ") : "");
+    if (!base) return res.status(400).json({ error: "Informe 'tema' ou 'slides'." });
+    const out = await generateText({
+      system: buildSystem(marca),
+      prompt: `Escreva a legenda de um post de Instagram sobre "${base}". 2-4 linhas + CTA de engajamento no fim. Sem hashtags exageradas.`,
+    });
+    res.json({ legenda: out });
+  })
+);
+
+/** GET /api/generate/trends?q=&period=&limit= → [{ titulo, fonte, quando, resumo }] */
+router.get(
+  "/trends",
+  wrap(async (req, res) => {
+    const { q, period = "semana", limit = 8 } = req.query;
+    if (!q) return res.status(400).json({ error: "Informe ?q= (tema)." });
+    const items = await fetchTrends({ query: String(q), period: String(period), limit: Number(limit) || 8 });
+    res.json({ items });
+  })
+);
+
+export default router;

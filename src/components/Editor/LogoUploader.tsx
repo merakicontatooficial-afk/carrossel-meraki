@@ -1,6 +1,6 @@
 import type { CarouselLogo, LogoPosition } from "../../types";
 import { Btn, Field, FileButton, Section } from "../ui";
-import { Trash2 } from "lucide-react";
+import { Trash2, BadgeCheck } from "lucide-react";
 
 const POSITIONS: { value: LogoPosition; label: string }[] = [
   { value: "tl", label: "↖" },
@@ -17,7 +17,7 @@ interface Props {
 /** Logo manual do carrossel: upload, mostrar/ocultar, posição no canto. */
 export default function LogoUploader({ logo, onChange }: Props) {
   return (
-    <Section title="Logo manual">
+    <Section title="Logo da Marca" icon={<BadgeCheck size={15} />}>
       <div className="flex items-center gap-2">
         {logo.src && (
           <img src={logo.src} alt="logo" className="h-9 max-w-[72px] rounded bg-white/5 object-contain p-1" />

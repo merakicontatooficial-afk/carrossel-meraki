@@ -1,15 +1,94 @@
 @import "tailwindcss";
 
+/* ── Identidade digital Meraki v3 — ESPELHA meraki-crm/web/src/styles.css ──
+   Preto puro · Poppins 500 · vidro neutro · roxo #5103c1 só como acento.
+   Fonte canônica: marcas/meraki/identidade.md (seção v3) + CRM/Publisher.  */
 :root {
   color-scheme: dark;
+  --bg: #000000;
+
+  /* Dois roxos com papéis distintos (decisão Luiz 21/07): saturado preenche,
+     claro brilha/marca. Não são substitutos. */
+  --brand-sat: #5103c1;   /* acento chapado: item ativo, seleção, progresso */
+  --brand: #7e65d8;       /* superfície e glow */
+  --brand-hi: #9d85f0;    /* texto e ícone de acento */
+  --brand-deep: #320c56;
+
+  /* Gradiente de texto do site — números grandes / títulos. */
+  --grad-text: linear-gradient(-1.45deg, #707070 7.5946%, #ffffff 75.094%);
+
+  /* Vidro do site: rgba(44,44,44,.2) + blur 18px saturate 140%. */
+  --glass: rgba(44, 44, 44, 0.2);
+  --glass-2: rgba(255, 255, 255, 0.06);
+  --glass-brd: rgba(255, 255, 255, 0.10);
+  --glass-brd-h: rgba(255, 255, 255, 0.2);
+  --glass-edge: rgba(255, 255, 255, 0.22);
+  --blur: blur(18px) saturate(140%);
+
+  --text-hi: #ffffff;
+  --text-md: #a8a8a8;
+  --text-lo: #7d7d7d;
+  --text-faint: rgba(255, 255, 255, 0.28);
+  --rose: #e58bb0;
+
+  --ff: "Poppins", system-ui, sans-serif;
+  --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; --r-pill: 9999px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --t: 220ms;
 }
 
 body {
-  background: #0b0b0e;
-  color: #e7e7ea;
-  font-family: "Inter", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-hi);
+  font-family: var(--ff);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+::selection { background: var(--brand); color: #fff; }
+
+/* Gradiente de texto (cinza→branco) — títulos e números grandes */
+.grad-text {
+  background-image: var(--grad-text);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ── Vidro (card padrão) ─────────────────────────────────── */
+.glass {
+  position: relative;
+  background: var(--glass);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-brd);
+  border-radius: var(--r-xl);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.glass::before {
+  content: ""; position: absolute; top: 0; left: 26px; right: 26px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-edge), transparent);
+  pointer-events: none;
+}
+
+/* ── Botões (base do CRM; interação em buttons.css) ──────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 16px; min-height: 42px; border-radius: var(--r-pill);
+  font-family: var(--ff); font-size: 12.5px; font-weight: 600;
+  color: var(--text-md); background: var(--glass);
+  border: 1px solid var(--glass-brd); cursor: pointer; white-space: nowrap;
+  transition: all var(--t) var(--ease);
+}
+.btn svg { width: 16px; height: 16px; }
+.btn:hover:not(:disabled) { background: var(--glass-2); color: var(--text-hi); border-color: var(--glass-brd-h); transform: translateY(-1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Principal: pílula de contorno branco (traço/inversão vêm de buttons.css) */
+.btn-primary { background: transparent; border-color: rgba(255, 255, 255, 0.55); color: var(--text-hi); }
+.btn-primary:hover:not(:disabled) { background: transparent; color: var(--text-hi); }
+.btn-danger { color: var(--rose); border-color: rgba(229, 139, 176, 0.3); }
+.btn-danger:hover:not(:disabled) { background: rgba(229, 139, 176, 0.08); color: var(--rose); }
+.icon-btn { width: 42px; height: 42px; min-height: 0; border-radius: 50%; padding: 0; }
 
 /* scrollbars discretas na UI do editor */
 * {

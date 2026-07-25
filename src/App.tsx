@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import type { BrandKit, Carousel, Collection, Slide, Template } from "./types";
+import type { BrandKit, Carousel, CarouselCounter, Collection, Slide, Template } from "./types";
 import { uid } from "./types";
-import { KITS, getKit, makeCarouselKit } from "./config/kits";
-import { getStructure, structureDefaultKit } from "./config/structures";
+import { getKit, makeCarouselKit } from "./config/kits";
 import { storage } from "./lib/storage";
 import { cloneSlides } from "./lib/clone";
-import { sliceWideImage } from "./lib/slice";
-import Library from "./components/Library/Library";
 import Editor from "./components/Editor/Editor";
 import { COLLECTION_COLORS } from "./components/Library/Collections";
+import Shell from "./components/Shell/Shell";
+import type { View } from "./components/Shell/Sidebar";
+import Dashboard from "./components/Dashboard/Dashboard";
+import { OrganizacaoView, TemplatesView, TrendingsView, ConfigView, Placeholder } from "./components/Shell/Views";
+import { Sparkles } from "lucide-react";
+import Wizard from "./components/Generate/Wizard";
 
 export default function App() {
   const [carousels, setCarousels] = useState<Carousel[]>(() => storage.loadCarousels());
@@ -16,8 +19,11 @@ export default function App() {
   const [collections, setCollections] = useState<Collection[]>(() => storage.loadCollections());
   const [customKits, setCustomKits] = useState<BrandKit[]>(() => storage.loadCustomKits());
   const [openId, setOpenId] = useState<string | null>(null);
-
-  const allKits = [...KITS, ...customKits];
+  const [view, setView] = useState<View>("dashboard");
+  const [search, setSearch] = useState("");
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardTema, setWizardTema] = useState("");
+  const [wizardMode, setWizardMode] = useState<"ia" | "zero">("ia");
 
   // persistência com debounce (dataURLs podem ser grandes)
   const saveTimer = useRef<number | undefined>(undefined);
@@ -48,22 +54,6 @@ export default function App() {
     setOpenId(c.id);
   };
 
-  // cada carrossel embute o próprio kit editável (sem "empresa" pré-definida)
-  const createCarousel = (structureId: string) => {
-    const structure = getStructure(structureId);
-    const kit = makeCarouselKit(structureDefaultKit(structureId), structure.name);
-    setCustomKits((all) => [...all, kit]);
-    addCarousel({
-      id: uid("car"),
-      name: structure.name,
-      templateId: structureId,
-      kitId: kit.id,
-      logo: { src: null, show: true, position: "br", scale: 1, everySlide: true },
-      slides: structure.build(),
-      updatedAt: Date.now(),
-    });
-  };
-
   const createFromTemplate = (templateId: string) => {
     const t = templates.find((x) => x.id === templateId);
     if (!t) return;
@@ -85,25 +75,18 @@ export default function App() {
     });
   };
 
-  const createContinuous = async (dataUrl: string) => {
-    const kit = makeCarouselKit("livre-escuro", "Contínuo");
+  // criação a partir do wizard de IA: kit + slides já prontos
+  const createFromAI = (kit: BrandKit, slides: Slide[], name: string, collectionId?: string, counter?: CarouselCounter) => {
     setCustomKits((all) => [...all, kit]);
-    const slices = await sliceWideImage(dataUrl, kit.bg);
-    const slides: Slide[] = slices.map((bgImage) => ({
-      id: uid("sl"),
-      kind: "value",
-      elements: [],
-      bg: "bg",
-      bgImage,
-      colors: { locked: true },
-    }));
     addCarousel({
       id: uid("car"),
-      name: "Contínuo",
-      templateId: "continuo",
+      name,
+      templateId: "ia",
       kitId: kit.id,
       logo: { src: null, show: true, position: "br", scale: 1, everySlide: true },
+      counter,
       slides,
+      collectionId,
       updatedAt: Date.now(),
     });
   };
@@ -168,27 +151,6 @@ export default function App() {
     setCollections((all) => [...all, { id: uid("col"), name, color: COLLECTION_COLORS[all.length % COLLECTION_COLORS.length] }]);
   };
 
-  const duplicateCollection = (id: string) => {
-    const src = collections.find((c) => c.id === id);
-    if (!src) return;
-    const copy: Collection = { id: uid("col"), name: `${src.name} (cópia)`, color: src.color };
-    setCollections((all) => [...all, copy]);
-    // duplica também os carrosséis da coleção
-    setCarousels((all) => [
-      ...all
-        .filter((c) => c.collectionId === id)
-        .map((c) => ({
-          ...c,
-          id: uid("car"),
-          name: `${c.name} (cópia)`,
-          slides: cloneSlides(c.slides),
-          collectionId: copy.id,
-          updatedAt: Date.now(),
-        })),
-      ...all,
-    ]);
-  };
-
   const deleteCollection = (id: string) => {
     setCollections((all) => all.filter((c) => c.id !== id));
     setCarousels((all) => all.map((c) => (c.collectionId === id ? { ...c, collectionId: undefined } : c)));
@@ -217,26 +179,84 @@ export default function App() {
     );
   }
 
+  const counts: Record<string, number> = {};
+  for (const c of carousels) if (c.collectionId) counts[c.collectionId] = (counts[c.collectionId] ?? 0) + 1;
+
+  const q = search.trim().toLowerCase();
+  const shownCarousels = q ? carousels.filter((c) => c.name.toLowerCase().includes(q)) : carousels;
+
+  const assignCollection = (carouselId: string, collectionId: string | undefined) =>
+    setCarousels((all) => all.map((c) => (c.id === carouselId ? { ...c, collectionId } : c)));
+
+  // "Estúdio" na navegação abre o carrossel mais recente (ou fica na view vazia).
+  const navigate = (v: View) => {
+    if (v === "estudio" && carousels[0]) {
+      setOpenId(carousels[0].id);
+      return;
+    }
+    setView(v);
+  };
+
   return (
-    <Library
-      carousels={carousels}
-      templates={templates}
-      collections={collections}
-      kits={allKits}
-      customKits={customKits}
-      onOpen={setOpenId}
-      onCreate={createCarousel}
-      onCreateFromTemplate={createFromTemplate}
-      onCreateContinuous={(d) => void createContinuous(d)}
-      onDuplicateCarousel={duplicateCarousel}
-      onDeleteCarousel={deleteCarousel}
-      onAssignCollection={(carouselId, collectionId) =>
-        setCarousels((all) => all.map((c) => (c.id === carouselId ? { ...c, collectionId } : c)))
-      }
-      onCreateCollection={createCollection}
-      onDuplicateCollection={duplicateCollection}
-      onDeleteCollection={deleteCollection}
-      onDeleteTemplate={(id) => setTemplates((all) => all.filter((t) => t.id !== id))}
-    />
+    <>
+      <Shell
+        view={view}
+        onNavigate={navigate}
+        onGerarIA={() => { setWizardMode("ia"); setWizardTema(""); setWizardOpen(true); }}
+        onCriar={() => { setWizardMode("zero"); setWizardTema(""); setWizardOpen(true); }}
+        search={search}
+        onSearch={setSearch}
+      >
+        {view === "dashboard" && (
+          <Dashboard
+            carousels={shownCarousels}
+            collections={collections}
+            customKits={customKits}
+            onGerarIA={() => { setWizardMode("ia"); setWizardTema(""); setWizardOpen(true); }}
+            onTemplates={() => setView("templates")}
+            onTreinar={() => setView("config")}
+            onOpen={setOpenId}
+            onDuplicate={duplicateCarousel}
+            onDelete={deleteCarousel}
+            onAssignCollection={assignCollection}
+          />
+        )}
+        {view === "estudio" && (
+          <Placeholder icon={<Sparkles size={22} />} title="Estúdio" note="Gere um carrossel ou abra um existente no Dashboard para editar aqui." />
+        )}
+        {view === "templates" && (
+          <TemplatesView
+            templates={templates}
+            onClone={createFromTemplate}
+            onDelete={(id) => setTemplates((all) => all.filter((t) => t.id !== id))}
+          />
+        )}
+        {view === "trendings" && (
+          <TrendingsView
+            onCreateFromTrend={(tema) => { setWizardMode("ia"); setWizardTema(tema); setWizardOpen(true); }}
+          />
+        )}
+        {view === "organizacao" && (
+          <OrganizacaoView collections={collections} counts={counts} onCreate={createCollection} onDelete={deleteCollection} />
+        )}
+        {view === "config" && <ConfigView />}
+      </Shell>
+
+      {wizardOpen && (
+        <Wizard
+          collections={collections}
+          templates={templates}
+          mode={wizardMode}
+          initialTema={wizardTema}
+          initialStep={wizardTema ? 1 : 0}
+          onClose={() => { setWizardOpen(false); setWizardTema(""); }}
+          onCreate={(kit, slides, name, collectionId, counter) => {
+            createFromAI(kit, slides, name, collectionId, counter);
+            setWizardOpen(false);
+            setWizardTema("");
+          }}
+        />
+      )}
+    </>
   );
 }
