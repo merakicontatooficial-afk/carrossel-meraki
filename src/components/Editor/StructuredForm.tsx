@@ -266,11 +266,12 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide, on
               <input
                 type="range"
                 min={0}
-                max={90}
+                max={100}
                 value={slide.scrimPos ?? 52}
                 onChange={(e) => onPatchSlide({ scrimPos: Number(e.target.value) })}
                 className="w-full"
               />
+              <p className="mt-1 text-[11px] text-[var(--text-lo)]">Quanto o degradê sobe. Acima disso a foto fica intacta.</p>
             </Field>
           </>
         )}

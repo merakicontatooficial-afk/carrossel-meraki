@@ -81,11 +81,26 @@ function coverPanTransform(px: number, py: number, zoom: number): string {
 function scrimBackground(scrim: number, pos: number, veil: number): string {
   const s = Math.min(1, Math.max(0, scrim) / 100);
   const v = Math.min(1, Math.max(0, veil) / 100);
-  const start = Math.max(24, 100 - pos); // pos maior = degradê sobe mais
-  const floor = Math.max(0, (s - 0.7) / 0.3); // acima de 70% o degradê "enche" o slide
-  const top = Math.max(s * 0.32, floor);
-  const grad = `linear-gradient(180deg, rgba(0,0,0,${top}) 0%, rgba(0,0,0,${floor}) 22%, rgba(0,0,0,${floor}) ${start}%, rgba(0,0,0,${s}) 100%)`;
-  return v > 0 ? `${grad}, linear-gradient(rgba(0,0,0,${v}), rgba(0,0,0,${v}))` : grad;
+  const layers: string[] = [];
+
+  if (s > 0) {
+    // o degradê vive SÓ da altura `pos` para baixo — acima disso a foto fica intacta.
+    // curva quadrática (nasce de leve e fecha forte) = transição suave, sem faixa dura.
+    const start = Math.max(0, Math.min(100, 100 - pos));
+    const N = 8;
+    const stops: string[] = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const pct = +(start + (100 - start) * t).toFixed(1);
+      const a = +(s * t * t).toFixed(3);
+      stops.push(`rgba(0,0,0,${a}) ${pct}%`);
+    }
+    layers.push(`linear-gradient(180deg, ${stops.join(", ")})`);
+  }
+  // véu uniforme (escurece a imagem inteira) — camada independente
+  if (v > 0) layers.push(`linear-gradient(rgba(0,0,0,${v}), rgba(0,0,0,${v}))`);
+
+  return layers.join(", ");
 }
 
 // ---------------------------------------------------------------------------

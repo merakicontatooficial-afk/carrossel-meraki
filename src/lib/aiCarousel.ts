@@ -95,7 +95,8 @@ function photoSlide(ai: AiSlide, i: number, reserve = 0): Slide {
   els.push(headline({ text: ai.headline, y, size: hlSize, h: hlH, up: true, weight: 800, lh: 1.06 }));
   y += hlH + 22;
   if (ai.body) els.push(bodyEl({ text: ai.body, y, h: bH, size: 34 }));
-  return slide(isCover ? "cover" : "value", els, { scrim: 74, scrimPos: 58 });
+  // degradê forte na base (chega a preto) cobrindo ~62% — topo da foto intacto
+  return slide(isCover ? "cover" : "value", els, { scrim: 96, scrimPos: 62 });
 }
 
 // ── SLIDE COM CARTÃO DE IMAGEM HORIZONTAL (retângulo largo, estilo MyPostFlow) ─
