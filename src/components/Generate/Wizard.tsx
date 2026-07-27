@@ -4,8 +4,9 @@ import { api, type AiCarousel, type AiModelo, type BrandVoice } from "../../lib/
 import { aiToSlides, modeloKit, modeloCounter, applyAlternating } from "../../lib/aiCarousel";
 import { KITS, kitToIdentity } from "../../config/kits";
 import { FONT_PAIRS, FONT_PAIR_AUTO } from "../../config/fontPairs";
+import { parseMdCarousel, mdImageSlides, type MdDoc } from "../../lib/mdCarousel";
 import { Field, Select, ColorInput, FileButton } from "../ui";
-import { LayoutGrid, PenLine, Layers, ImageIcon, Type, Wand2, X, ArrowLeft, ArrowRight, Loader2, Check, Newspaper, Palette } from "lucide-react";
+import { LayoutGrid, PenLine, Layers, ImageIcon, Type, Wand2, X, ArrowLeft, ArrowRight, Loader2, Check, Newspaper, Palette, FileCode, Upload, AlertTriangle, Copy } from "lucide-react";
 
 interface Props {
   collections: Collection[];
@@ -54,7 +55,10 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const [step, setStep] = useState(initialStep ?? 0);
   const [tema, setTema] = useState(initialTema ?? "");
   const [collectionId, setCollectionId] = useState("");
-  const [conteudoExato, setConteudoExato] = useState(false);
+  // origem do conteúdo: auto (IA escreve / em branco no modo zero), exato (texto colado), md (roteiro pronto)
+  const [fonte, setFonte] = useState<"auto" | "exato" | "md">("auto");
+  const [mdText, setMdText] = useState("");
+  const [mdDoc, setMdDoc] = useState<MdDoc | null>(null);
   const [idioma, setIdioma] = useState("pt-BR");
   const [nSlides, setNSlides] = useState(5);
   const [modelo, setModelo] = useState<AiModelo>("minimalista");
@@ -121,6 +125,51 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   // mexeu numa cor na mão → deixa de ser "a identidade salva"
   const manual = (setter: (v: string) => void) => (v: string) => { setter(v); setIdentityId(""); };
 
+  /**
+   * Lê o roteiro .md e já configura o wizard com o que o arquivo declarou
+   * (cliente, modelo, imagens, nº de slides). O usuário ainda pode ajustar tudo.
+   */
+  const carregarMd = (texto: string) => {
+    setMdText(texto);
+    setErro(null);
+    if (!texto.trim()) { setMdDoc(null); return; }
+    const doc = parseMdCarousel(texto);
+    setMdDoc(doc);
+    if (!doc.slides.length) return;
+
+    setFonte("md");
+    setNSlides(doc.slides.length);
+    if (doc.modelo) setModelo(doc.modelo);
+    if (doc.imagens) setImgMode(doc.imagens);
+    if (doc.handle) setHandle(doc.handle);
+
+    // cliente do .md → coleção com o mesmo nome (voz + identidade visual)
+    const alvo = (doc.cliente ?? "").trim().toLowerCase();
+    const col = alvo ? collections.find((c) => c.name.trim().toLowerCase() === alvo) : undefined;
+    if (col) escolherCliente(col.id);
+
+    // identidade explícita no .md tem prioridade sobre a do cliente
+    const nomeIdent = (doc.identidade ?? "").trim().toLowerCase();
+    if (nomeIdent) {
+      const ci = collections.find((c) => c.identity && c.name.trim().toLowerCase() === nomeIdent);
+      const ki = KITS.find((k) => k.name.trim().toLowerCase() === nomeIdent || k.id === nomeIdent);
+      if (ci) applyIdentity(`col:${ci.id}`);
+      else if (ki) applyIdentity(`kit:${ki.id}`);
+    }
+
+    const comImagem = mdImageSlides(doc);
+    if (comImagem.length) setSlidesComImagem(comImagem);
+  };
+
+  const lerArquivoMd = (dataUrl: string) => {
+    try {
+      const b64 = dataUrl.split(",")[1] ?? "";
+      carregarMd(new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))));
+    } catch {
+      setErro("Não consegui ler esse arquivo. Salve como .md em UTF-8 e tente de novo.");
+    }
+  };
+
   const buscarNoticias = async () => {
     if (!tema.trim()) return;
     setBusy("Buscando notícias…");
@@ -156,7 +205,10 @@ export default function Wizard({ collections, templates, initialTema, initialSte
       const marca: BrandVoice | undefined = clienteNome ? { nome: clienteNome, brief: cliente?.brief ?? undefined } : undefined;
 
       let ai: AiCarousel;
-      if (zero) {
+      if (fonte === "md" && mdDoc?.slides.length) {
+        // roteiro pronto: os textos do .md entram como estão (com a marcação de destaque)
+        ai = { slides: mdDoc.slides.map(({ kind, eyebrow, headline, body }) => ({ kind, eyebrow, headline, body })) };
+      } else if (zero) {
         // criar do zero: slides em branco (textos-placeholder p/ editar no editor)
         ai = {
           slides: Array.from({ length: nSlides }, (_, i) => ({
@@ -165,7 +217,7 @@ export default function Wizard({ collections, templates, initialTema, initialSte
             body: "Toque para editar este texto.",
           })),
         };
-      } else if (conteudoExato) {
+      } else if (fonte === "exato") {
         ai = splitExato(tema, nSlides);
       } else {
         setBusy("Pesquisando e escrevendo o carrossel…");
@@ -175,7 +227,10 @@ export default function Wizard({ collections, templates, initialTema, initialSte
       // quais slides terão imagem (só se o modo não for "sem imagens")
       const imageSlides = imgMode === "sem" ? [] : slidesComImagem.filter((n) => n >= 1 && n <= ai.slides.length);
 
-      const name = (zero ? "" : tema.slice(0, 40)) || (clienteNome ? `${clienteNome} · Novo carrossel` : "Novo carrossel");
+      const name =
+        (fonte === "md" ? mdDoc?.titulo?.slice(0, 60) : "") ||
+        (zero ? "" : tema.slice(0, 40)) ||
+        (clienteNome ? `${clienteNome} · Novo carrossel` : "Novo carrossel");
       const kit = modeloKit(modelo, cAccent, clienteNome ? `${clienteNome} · ${name}` : name, brandName || undefined);
       // template salvo tem prioridade de look
       const tpl = templates.find((t) => t.id === templateId);
@@ -201,11 +256,13 @@ export default function Wizard({ collections, templates, initialTema, initialSte
           setBusy(`Gerando imagem ${k + 1} de ${imageSlides.length}…`);
           try {
             const ctx = ai.slides[idx - 1]?.headline ?? tema;
-            const prompt = estiloImg.trim() || `Cena fotográfica que ilustra: ${ctx}`;
+            // descrição vinda do .md manda; o "estilo das imagens" entra como complemento
+            const descMd = fonte === "md" ? (mdDoc?.slides[idx - 1]?.imagem ?? "").trim() : "";
+            const prompt = [descMd || `Cena fotográfica que ilustra: ${ctx}`, estiloImg.trim()].filter(Boolean).join(" · ");
             const img = await api.generateImage({
               prompt,
               refImageBase64: refB64,
-              contexto: [clienteNome, tema, ctx].filter(Boolean).join(" · "),
+              contexto: [clienteNome, fonte === "md" ? mdDoc?.titulo : tema, ctx].filter(Boolean).join(" · "),
             });
             const target = slides[idx - 1];
             // maior slot de imagem vazio (evita cair no avatar do Profile)
@@ -232,9 +289,18 @@ export default function Wizard({ collections, templates, initialTema, initialSte
     }
   };
 
-  const canNext = step === 1 && !zero ? tema.trim().length > 2 : true;
+  const canNext =
+    step !== 1 ? true
+      : fonte === "md" ? !!mdDoc?.slides.length
+        : zero ? true
+          : tema.trim().length > 2;
   const last = step === 5;
-  const cur = zero && step === 1 ? { ...STEPS[1], title: "Do que é o carrossel", sub: "Defina cliente e nº de slides — os textos você escreve no editor" } : STEPS[step];
+  const cur =
+    step === 1 && fonte === "md"
+      ? { ...STEPS[1], title: "Conteúdo · roteiro .md", sub: "Suba o .md do Claude — ele define textos, destaques e nº de slides" }
+      : zero && step === 1
+        ? { ...STEPS[1], title: "Do que é o carrossel", sub: "Defina cliente e nº de slides — os textos você escreve no editor" }
+        : STEPS[step];
 
   const card = "rounded-2xl border p-4 text-left transition";
   const chip = (active: boolean) =>
@@ -288,33 +354,109 @@ export default function Wizard({ collections, templates, initialTema, initialSte
           {/* 2 · Conteúdo */}
           {step === 1 && (
             <div className="space-y-4">
-              {zero ? (
+              {/* origem do conteúdo — vale tanto pra "Gerar com IA" quanto pra "Criar do zero" */}
+              <div>
+                <div className="mb-1.5 text-xs text-[var(--text-md)]">De onde vem o conteúdo?</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "auto" as const, label: zero ? "Em branco" : "IA escreve", desc: zero ? "Você escreve no editor" : "A partir do tema" },
+                    { id: "exato" as const, label: "Texto exato", desc: "Cola e distribui" },
+                    { id: "md" as const, label: "Roteiro .md", desc: "Vindo do Claude" },
+                  ].map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => setFonte(o.id)}
+                      className={`rounded-lg border px-2.5 py-2 text-left transition ${fonte === o.id ? "border-[var(--brand-sat)] bg-[var(--brand-sat)]/15" : "border-white/10 hover:border-white/25"}`}
+                    >
+                      <div className="text-[12px] font-semibold text-white">{o.label}</div>
+                      <div className="text-[10px] leading-tight text-[var(--text-lo)]">{o.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* roteiro .md — o arquivo manda no conteúdo e já configura o wizard */}
+              {fonte === "md" && (
+                <div className="rounded-xl border border-white/10 p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <FileCode size={14} className="text-[var(--brand-hi)]" />
+                    <span className="mr-auto text-[12px] font-semibold text-white">Roteiro pronto (.md)</span>
+                    <FileButton label={<><Upload size={13} /> Subir .md</>} accept=".md,.markdown,.txt" onFile={lerArquivoMd} />
+                  </div>
+                  <textarea
+                    value={mdText}
+                    onChange={(e) => carregarMd(e.target.value)}
+                    rows={6}
+                    placeholder={"Cole aqui o .md gerado pelo Claude (skill carrossel-meraki)…\n\n## capa\n# O erro que ==trava== seu delivery\n\n## valor\ntag: ERRO 1\n# Foto ruim *mata* o pedido\nO cliente decide em 3 segundos."}
+                    className="w-full resize-y rounded-lg border border-white/10 bg-white/5 p-3 font-mono text-[11.5px] leading-relaxed text-white outline-none focus:border-[var(--glass-brd-h)]"
+                  />
+                  {mdDoc && mdDoc.slides.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--brand-hi)]">
+                        <span className="flex items-center gap-1"><Check size={12} /> {mdDoc.slides.length} slides lidos</span>
+                        {mdDoc.cliente && <span className="text-[var(--text-md)]">cliente: {mdDoc.cliente}</span>}
+                        {mdDoc.modelo && <span className="text-[var(--text-md)]">modelo: {mdDoc.modelo}</span>}
+                        {mdImageSlides(mdDoc).length > 0 && <span className="text-[var(--text-md)]">imagem em: {mdImageSlides(mdDoc).join(", ")}</span>}
+                      </div>
+                      <ol className="max-h-32 space-y-0.5 overflow-y-auto text-[11px] text-[var(--text-md)]">
+                        {mdDoc.slides.map((s, i) => (
+                          <li key={i} className="truncate">
+                            <span className="text-[var(--text-lo)]">{i + 1}. [{s.kind}]</span> {s.headline}
+                          </li>
+                        ))}
+                      </ol>
+                      {mdDoc.avisos.length > 0 && (
+                        <div className="space-y-0.5 rounded-lg bg-amber-500/10 px-2.5 py-2">
+                          {mdDoc.avisos.map((a, i) => (
+                            <p key={i} className="flex gap-1.5 text-[11px] leading-snug text-amber-200/90"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {a}</p>
+                          ))}
+                        </div>
+                      )}
+                      {mdDoc.legenda && (
+                        <button
+                          className="btn !min-h-0 w-full !py-1.5 text-[11px]"
+                          onClick={() => { navigator.clipboard.writeText(mdDoc.legenda!); setErro("Legenda copiada para a área de transferência."); }}
+                        >
+                          <Copy size={12} /> Copiar a legenda do .md
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {mdText.trim() && mdDoc && mdDoc.slides.length === 0 && (
+                    <p className="mt-2 text-[11px] text-red-300">Não encontrei slides nesse arquivo. Use `## capa`, `## valor`, `## cta` como títulos de slide.</p>
+                  )}
+                </div>
+              )}
+
+              {fonte === "auto" && zero && (
                 <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-[12px] leading-relaxed text-[var(--text-md)]">
                   Modo <b className="text-white">Criar do zero</b>: o carrossel abre com os textos em branco pra você escrever no editor. Todas as demais configurações (modelo, imagens, cores, tipografia) continuam disponíveis.
                 </p>
-              ) : (
+              )}
+
+              {fonte !== "md" && !(zero && fonte === "auto") && (
                 <>
-                  <Field label="Sobre o que é o conteúdo?">
-                    <textarea autoFocus value={tema} onChange={(e) => setTema(e.target.value)} rows={3} placeholder="Ex.: 5 erros que travam o crescimento de um restaurante no Instagram" className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]" />
+                  <Field label={fonte === "exato" ? "Cole o texto que vai nos slides" : "Sobre o que é o conteúdo?"}>
+                    <textarea autoFocus value={tema} onChange={(e) => setTema(e.target.value)} rows={fonte === "exato" ? 6 : 3} placeholder={fonte === "exato" ? "Cada linha/parágrafo vira um pedaço do carrossel — o texto não é reescrito." : "Ex.: 5 erros que travam o crescimento de um restaurante no Instagram"} className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]" />
                   </Field>
-                  <div>
-                    <button className="btn w-full" onClick={buscarNoticias} disabled={!!busy || !tema.trim()}><Newspaper size={15} /> Buscar notícias recentes sobre o tema</button>
-                    {trends && (
-                      <div className="mt-2 space-y-1">
-                        {trends.length === 0 && <p className="text-[11px] text-[var(--text-lo)]">Nada encontrado.</p>}
-                        {trends.map((t, i) => (
-                          <button key={i} onClick={() => { setTema(t.titulo); setTrends(null); }} className="block w-full rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-left text-xs text-[var(--text-md)] hover:text-white">{t.titulo}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 p-3">
-                    <input type="checkbox" checked={conteudoExato} onChange={(e) => setConteudoExato(e.target.checked)} className="mt-0.5" style={{ accentColor: "var(--brand-sat)" }} />
-                    <span><span className="text-sm text-white">Conteúdo exato</span><br /><span className="text-[11px] text-[var(--text-lo)]">Distribui o texto fornecido nos slides sem reescrever</span></span>
-                  </label>
-                  <Field label="Idioma do conteúdo">
-                    <Select value={idioma} onChange={setIdioma} options={[{ value: "pt-BR", label: "Português (BR)" }, { value: "en", label: "English" }, { value: "es", label: "Español" }]} />
-                  </Field>
+                  {fonte === "auto" && (
+                    <div>
+                      <button className="btn w-full" onClick={buscarNoticias} disabled={!!busy || !tema.trim()}><Newspaper size={15} /> Buscar notícias recentes sobre o tema</button>
+                      {trends && (
+                        <div className="mt-2 space-y-1">
+                          {trends.length === 0 && <p className="text-[11px] text-[var(--text-lo)]">Nada encontrado.</p>}
+                          {trends.map((t, i) => (
+                            <button key={i} onClick={() => { setTema(t.titulo); setTrends(null); }} className="block w-full rounded-lg border border-white/8 bg-white/5 px-3 py-2 text-left text-xs text-[var(--text-md)] hover:text-white">{t.titulo}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {fonte === "auto" && (
+                    <Field label="Idioma do conteúdo">
+                      <Select value={idioma} onChange={setIdioma} options={[{ value: "pt-BR", label: "Português (BR)" }, { value: "en", label: "English" }, { value: "es", label: "Español" }]} />
+                    </Field>
+                  )}
                 </>
               )}
               <Field label="Cliente / marca (opcional — define a voz e as cores)">
@@ -332,11 +474,17 @@ export default function Wizard({ collections, templates, initialTema, initialSte
               </Field>
               <div>
                 <div className="mb-1.5 text-xs text-[var(--text-md)]">Número de slides</div>
-                <div className="grid grid-cols-10 gap-1.5">
-                  {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
-                    <button key={n} onClick={() => setNSlides(n)} className={chip(n === nSlides)}>{n}</button>
-                  ))}
-                </div>
+                {fonte === "md" ? (
+                  <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-[var(--text-md)]">
+                    Definido pelo roteiro: <b className="text-white">{nSlides} slides</b>. Pra mudar, edite o .md.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-10 gap-1.5">
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+                      <button key={n} onClick={() => setNSlides(n)} className={chip(n === nSlides)}>{n}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
