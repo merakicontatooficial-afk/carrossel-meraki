@@ -266,6 +266,11 @@ export default function App() {
       <Editor
         carousel={open}
         kit={resolveKit(open)}
+        marca={(() => {
+          // voz + dossiê do cliente do carrossel (alimenta legenda, refino e imagem)
+          const col = collections.find((c) => c.id === open.collectionId);
+          return col ? { nome: col.name, brief: col.brief ?? undefined } : undefined;
+        })()}
         onChange={updateCarousel}
         onUpdateCustomKit={updateCustomKit}
         onCreateCustomKit={createCustomKit}

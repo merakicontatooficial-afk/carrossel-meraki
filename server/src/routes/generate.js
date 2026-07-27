@@ -1,7 +1,7 @@
 // Rotas de IA — proxy fino sobre a camada Gemini.
 import { Router } from "express";
 import { generateJson, generateText, generateImage, fetchTrends, fetchDailyTrends, researchTopic } from "../gemini.js";
-import { buildSystem, carouselSchema, carouselPrompt } from "../prompts.js";
+import { buildSystem, carouselSchema, carouselPrompt, CAPTION_EXPERTISE } from "../prompts.js";
 import { db } from "../db.js";
 
 const router = Router();
@@ -50,11 +50,11 @@ router.post(
 router.post(
   "/image",
   wrap(async (req, res) => {
-    const { prompt, refImageBase64, refMime, refs, hq = false } = req.body || {};
+    const { prompt, refImageBase64, refMime, refs, contexto, fast = false } = req.body || {};
     if (!prompt || !String(prompt).trim()) {
       return res.status(400).json({ error: "Informe o 'prompt' da imagem." });
     }
-    const out = await generateImage({ prompt, refImageBase64, refMime, refs, hq: !!hq });
+    const out = await generateImage({ prompt, refImageBase64, refMime, refs, contexto, fast: !!fast });
     res.json(out);
   })
 );
@@ -75,16 +75,26 @@ router.post(
   })
 );
 
-/** POST /api/generate/caption  { tema, slides? } → { legenda } */
+/** POST /api/generate/caption  { tema, slides? } → { legenda }
+ *  Agente de LEGENDA: regras da Meraki + dossiê da marca do cliente. */
 router.post(
   "/caption",
   wrap(async (req, res) => {
     const { tema, slides, marca } = req.body || {};
-    const base = tema || (Array.isArray(slides) ? slides.map((s) => s.headline).join(" / ") : "");
+    const lista = Array.isArray(slides) ? slides : [];
+    const base = tema || lista.map((s) => s.headline).join(" / ");
     if (!base) return res.status(400).json({ error: "Informe 'tema' ou 'slides'." });
+
+    // o conteúdo real do carrossel, slide a slide, pra legenda AMPLIAR (não repetir)
+    const roteiro = lista.length
+      ? lista.map((s, i) => `Slide ${i + 1} (${s.kind}): ${s.headline}${s.body ? ` — ${s.body}` : ""}`).join("\n")
+      : `Tema: ${base}`;
+
     const out = await generateText({
-      system: buildSystem(marca),
-      prompt: `Escreva a legenda de um post de Instagram sobre "${base}". 2-4 linhas + CTA de engajamento no fim. Sem hashtags exageradas.`,
+      // voz do cliente (com dossiê) + expertise de legenda
+      system: `${buildSystem(marca)}\n\n${CAPTION_EXPERTISE}`,
+      prompt: `Escreva a legenda do post de Instagram deste carrossel.\n\nCONTEÚDO DO CARROSSEL:\n${roteiro}\n\nA legenda amplia o carrossel (contexto, exemplo, bastidor) — não repete os slides.`,
+      temperature: 0.85,
     });
     res.json({ legenda: out });
   })

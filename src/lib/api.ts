@@ -118,7 +118,7 @@ export const api = {
   generateCarousel(input: { tema: string; nSlides: number; modelo: AiModelo; marca?: BrandVoice; idioma?: string }) {
     return post<AiCarousel>("/api/generate/carousel", input);
   },
-  generateImage(input: { prompt: string; refImageBase64?: string; refMime?: string; refs?: { data: string; mime: string }[]; hq?: boolean }) {
+  generateImage(input: { prompt: string; refImageBase64?: string; refMime?: string; refs?: { data: string; mime: string }[]; contexto?: string; fast?: boolean }) {
     return post<{ dataUrl: string; model: string }>("/api/generate/image", input);
   },
   refineSlide(input: { texto: string; instrucao: string; marca?: BrandVoice }) {

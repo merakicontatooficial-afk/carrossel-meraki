@@ -4,6 +4,7 @@
 // trends (Google Search grounding). Modelos centralizados aqui.
 // ─────────────────────────────────────────────────────────────
 import { GoogleGenAI } from "@google/genai";
+import { buildImagePrompt } from "./prompts.js";
 
 const KEY = process.env.GEMINI_API_KEY;
 if (!KEY) {
@@ -17,8 +18,10 @@ const ai = new GoogleGenAI({ apiKey: KEY });
 
 export const MODELS = {
   text: process.env.GEMINI_MODEL_TEXT || "gemini-flash-latest",
-  image: process.env.GEMINI_MODEL_IMAGE || "gemini-3.1-flash-image", // Nano Banana (default)
-  imagePro: process.env.GEMINI_MODEL_IMAGE_PRO || "gemini-3-pro-image", // Nano Banana Pro (4K, pago)
+  // PADRÃO = Nano Banana **Pro**: qualidade fotográfica muito superior (custa mais
+  // por imagem, decisão do Luiz em 27/07). O Flash fica como modo econômico.
+  image: process.env.GEMINI_MODEL_IMAGE || "gemini-3-pro-image",
+  imageFast: process.env.GEMINI_MODEL_IMAGE_FAST || "gemini-2.5-flash-image",
 };
 
 /** Garante que a chave existe antes de gastar uma chamada. */
@@ -89,11 +92,12 @@ export async function generateText({ prompt, system, temperature = 0.8 }) {
  * rosto/produto de referência. `hq: true` usa Nano Banana Pro (4K, pago).
  * Retorna { dataUrl } pronto pra virar bgImage do slide.
  */
-export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, hq = false }) {
+export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, contexto, fast = false }) {
   assertKey();
-  const model = hq ? MODELS.imagePro : MODELS.image;
+  const model = fast ? MODELS.imageFast : MODELS.image;
 
-  const parts = [{ text: prompt }];
+  // AGENTE DE FOTOGRAFIA: a descrição do usuário vira um briefing de foto real.
+  const parts = [{ text: buildImagePrompt(prompt, contexto) }];
   // múltiplas referências (até 3): rosto, produto, estilo… `refs` = [{ data, mime }]
   const lista = Array.isArray(refs) && refs.length
     ? refs

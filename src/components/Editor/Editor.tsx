@@ -33,6 +33,7 @@ const ALIGN_BTNS: { t?: string; i?: React.ReactNode; calc?: (el: Element) => Par
 interface Props {
   carousel: Carousel;
   kit: BrandKit;
+  marca?: { nome: string; brief?: string }; // cliente do carrossel (voz + dossiê)
   onChange: (c: Carousel) => void;
   onUpdateCustomKit: (kit: BrandKit) => void;
   onCreateCustomKit: (kit: BrandKit) => void;
@@ -43,6 +44,7 @@ interface Props {
 export default function Editor({
   carousel,
   kit,
+  marca,
   onChange: applyChange,
   onUpdateCustomKit,
   onCreateCustomKit,
@@ -280,12 +282,15 @@ export default function Editor({
     body: s.elements.find((e) => e.role === "body")?.text ?? "",
   });
 
+  // contexto do conteúdo: ajuda o agente de fotografia a criar uma cena coerente
+  const contextoImg = () => [marca?.nome, slideText(slide).headline || carousel.name].filter(Boolean).join(" · ");
+
   // gera a FOTO DE FUNDO do slide (prompt + até 3 referências)
   const genImage = async ({ prompt, refs }: AiImageInput) => {
     setAiBusy("Gerando imagem…");
     try {
       const p = prompt || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt: p, refs });
+      const img = await api.generateImage({ prompt: p, refs, contexto: contextoImg() });
       commitHistory();
       patchSlide(safeIndex, { bgImage: img.dataUrl, bgScale: 1, scrim: slide.scrim ?? 96, scrimPos: slide.scrimPos ?? 62 });
     } catch (e) {
@@ -300,7 +305,7 @@ export default function Editor({
     setAiBusy("Gerando imagem…");
     try {
       const p = input?.prompt || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt: p, refs: input?.refs });
+      const img = await api.generateImage({ prompt: p, refs: input?.refs, contexto: contextoImg() });
       commitHistory();
       patchElement(elId, { src: img.dataUrl });
     } catch (e) {
@@ -321,7 +326,7 @@ export default function Editor({
     if (!hEl || !refineInstr.trim()) return;
     setAiBusy("Refinando…");
     try {
-      const { texto } = await api.refineSlide({ texto: hEl.text ?? "", instrucao: refineInstr });
+      const { texto } = await api.refineSlide({ texto: hEl.text ?? "", instrucao: refineInstr, marca });
       patchElement(hEl.id, { text: texto });
       setRefineInstr("");
     } catch (e) {
@@ -335,7 +340,7 @@ export default function Editor({
     setAiBusy("Gerando legenda…");
     try {
       const slides = carousel.slides.map((s) => ({ kind: (s.kind ?? "value") as "cover" | "value" | "proof" | "cta", ...slideText(s) }));
-      const { legenda } = await api.generateCaption({ slides });
+      const { legenda } = await api.generateCaption({ slides, marca });
       setCaption(legenda);
     } catch (e) {
       alert("Falha ao gerar legenda: " + (e as Error).message);

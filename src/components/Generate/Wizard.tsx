@@ -170,8 +170,12 @@ export default function Wizard({ collections, templates, initialTema, initialSte
           setBusy(`Gerando imagem ${k + 1} de ${imageSlides.length}…`);
           try {
             const ctx = ai.slides[idx - 1]?.headline ?? tema;
-            const prompt = `${estiloImg.trim() || "Imagem premium, sem texto na imagem"} — cena para: "${ctx}"`;
-            const img = await api.generateImage({ prompt, refImageBase64: refB64 });
+            const prompt = estiloImg.trim() || `Cena fotográfica que ilustra: ${ctx}`;
+            const img = await api.generateImage({
+              prompt,
+              refImageBase64: refB64,
+              contexto: [clienteNome, tema, ctx].filter(Boolean).join(" · "),
+            });
             const target = slides[idx - 1];
             // maior slot de imagem vazio (evita cair no avatar do Profile)
             const imgEl = target.elements
