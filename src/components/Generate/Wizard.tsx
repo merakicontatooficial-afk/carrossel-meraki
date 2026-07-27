@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { BrandKit, CarouselCounter, Collection, Slide, Template } from "../../types";
+import type { BrandIdentity, BrandKit, CarouselCounter, Collection, Slide, Template } from "../../types";
 import { api, type AiCarousel, type AiModelo, type BrandVoice } from "../../lib/api";
 import { aiToSlides, modeloKit, modeloCounter, applyAlternating } from "../../lib/aiCarousel";
+import { KITS, kitToIdentity } from "../../config/kits";
+import { FONT_PAIRS, FONT_PAIR_AUTO } from "../../config/fontPairs";
 import { Field, Select, ColorInput, FileButton } from "../ui";
-import { LayoutGrid, PenLine, Layers, ImageIcon, Type, Wand2, X, ArrowLeft, ArrowRight, Loader2, Check, Newspaper } from "lucide-react";
+import { LayoutGrid, PenLine, Layers, ImageIcon, Type, Wand2, X, ArrowLeft, ArrowRight, Loader2, Check, Newspaper, Palette } from "lucide-react";
 
 interface Props {
   collections: Collection[];
@@ -30,18 +32,6 @@ const MODELOS: { id: AiModelo; nome: string; desc: string; preview: "min" | "pro
   { id: "creators", nome: "Creators", desc: "Texto em gradiente com barras de progresso. Moderno e claro.", preview: "cre" },
   { id: "techviral", nome: "TechViral", desc: "Títulos com marca-texto e cards. Ideal para tech, IA e notícias.", preview: "tech" },
 ];
-
-const FONT_PAIRS: Record<string, { display: string; body: string }> = {
-  "Automático (do modelo)": { display: "", body: "" },
-  "Clash + Inter": { display: "Clash Grotesk", body: "Inter" },
-  "Clash + Clash": { display: "Clash Grotesk", body: "Clash Grotesk" },
-  "Space + Inter": { display: "Space Grotesk", body: "Inter" },
-  "Archivo + Inter": { display: "Archivo Black", body: "Inter" },
-  "Anton + DM Sans": { display: "Anton", body: "DM Sans" },
-  "Sora + Inter": { display: "Sora", body: "Inter" },
-  "Bebas + Manrope": { display: "Bebas Neue", body: "Manrope" },
-  "Poppins + Poppins": { display: "Poppins", body: "Poppins" },
-};
 
 const IMG_MODES = [
   { id: "sem", label: "Sem imagens", on: true },
@@ -74,7 +64,8 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const [refImage, setRefImage] = useState<string | null>(null);
   const [slidesComImagem, setSlidesComImagem] = useState<number[]>([1]);
   const [handle, setHandle] = useState("");
-  const [fontPair, setFontPair] = useState("Automático (do modelo)");
+  const [fontPair, setFontPair] = useState(FONT_PAIR_AUTO);
+  const [identityId, setIdentityId] = useState(""); // "" = cores manuais
   const [templateId, setTemplateId] = useState("");
   const [cFundo, setCFundo] = useState("#0A0A0B");
   const [cTitulo, setCTitulo] = useState("#FFFFFF");
@@ -89,6 +80,46 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const cliente = collections.find((c) => c.id === collectionId);
   const clienteNome = cliente?.name;
   const brandName = handle.replace(/^@/, "").trim() || clienteNome || "";
+
+  // ── identidade visual (cores salvas em Organização, ou um kit do app) ──
+  const identityOptions = [
+    { value: "", label: "— Cores manuais —" },
+    ...collections.filter((c) => c.identity).map((c) => ({ value: `col:${c.id}`, label: `${c.name} · salva` })),
+    ...KITS.map((k) => ({ value: `kit:${k.id}`, label: `Kit ${k.name}` })),
+  ];
+
+  const findIdentity = (v: string): BrandIdentity | null => {
+    if (v.startsWith("col:")) return collections.find((c) => c.id === v.slice(4))?.identity ?? null;
+    if (v.startsWith("kit:")) {
+      const k = KITS.find((x) => x.id === v.slice(4));
+      return k ? kitToIdentity(k) : null;
+    }
+    return null;
+  };
+
+  /** Preenche os campos do wizard com uma identidade salva. */
+  const applyIdentity = (v: string) => {
+    setIdentityId(v);
+    const idv = findIdentity(v);
+    if (!idv) return;
+    setCFundo(idv.bg);
+    setCTitulo(idv.text);
+    setCSub(idv.muted);
+    setCAccent(idv.accent);
+    if (idv.bgAlt) setCFundo2(idv.bgAlt);
+    if (idv.fontPair && FONT_PAIRS[idv.fontPair]) setFontPair(idv.fontPair);
+    if (idv.handle) setHandle(idv.handle);
+  };
+
+  // escolher o cliente já traz a identidade dele (se tiver uma salva)
+  const escolherCliente = (id: string) => {
+    setCollectionId(id);
+    const col = collections.find((c) => c.id === id);
+    if (col?.identity) applyIdentity(`col:${id}`);
+  };
+
+  // mexeu numa cor na mão → deixa de ser "a identidade salva"
+  const manual = (setter: (v: string) => void) => (v: string) => { setter(v); setIdentityId(""); };
 
   const buscarNoticias = async () => {
     if (!tema.trim()) return;
@@ -286,8 +317,18 @@ export default function Wizard({ collections, templates, initialTema, initialSte
                   </Field>
                 </>
               )}
-              <Field label="Cliente / marca (opcional — define a voz)">
-                <Select value={collectionId} onChange={setCollectionId} options={[{ value: "", label: "— Voz padrão da Meraki —" }, ...collections.map((c) => ({ value: c.id, label: c.name }))]} />
+              <Field label="Cliente / marca (opcional — define a voz e as cores)">
+                <Select value={collectionId} onChange={escolherCliente} options={[{ value: "", label: "— Voz padrão da Meraki —" }, ...collections.map((c) => ({ value: c.id, label: c.name }))]} />
+                {cliente?.identity && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--brand-hi)]">
+                    <Palette size={12} /> Identidade visual de {cliente.name} aplicada.
+                    <span className="flex gap-1">
+                      {[cliente.identity.bg, cliente.identity.text, cliente.identity.muted, cliente.identity.accent].map((cor, i) => (
+                        <span key={i} className="h-3 w-3 rounded-full border border-white/20" style={{ background: cor }} />
+                      ))}
+                    </span>
+                  </p>
+                )}
               </Field>
               <div>
                 <div className="mb-1.5 text-xs text-[var(--text-md)]">Número de slides</div>
@@ -395,13 +436,19 @@ export default function Wizard({ collections, templates, initialTema, initialSte
               <Field label="Template salvo (opcional)">
                 <Select value={templateId} onChange={setTemplateId} options={[{ value: "", label: "— Não usar template —" }, ...templates.map((t) => ({ value: t.id, label: t.name }))]} />
               </Field>
+              <Field label="Identidade visual da marca">
+                <Select value={identityId} onChange={applyIdentity} options={identityOptions} />
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-lo)]">
+                  As identidades salvas vêm dos clientes cadastrados em <b className="text-[var(--text-md)]">Organização</b>. Escolher uma preenche as cores abaixo; editar uma cor na mão volta pra "manual".
+                </p>
+              </Field>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <div className="text-xs text-[var(--text-md)]">Identidade visual</div>
-                  <ColorRow label="Fundo" value={cFundo} onChange={setCFundo} />
-                  <ColorRow label="Título" value={cTitulo} onChange={setCTitulo} />
-                  <ColorRow label="Subtítulo" value={cSub} onChange={setCSub} />
-                  <ColorRow label="Destaque" value={cAccent} onChange={setCAccent} />
+                  <div className="text-xs text-[var(--text-md)]">Cores</div>
+                  <ColorRow label="Fundo" value={cFundo} onChange={manual(setCFundo)} />
+                  <ColorRow label="Título" value={cTitulo} onChange={manual(setCTitulo)} />
+                  <ColorRow label="Subtítulo" value={cSub} onChange={manual(setCSub)} />
+                  <ColorRow label="Destaque" value={cAccent} onChange={manual(setCAccent)} />
                 </div>
                 {/* preview ao vivo */}
                 <div className="flex flex-col justify-end rounded-xl p-4" style={{ background: cFundo, aspectRatio: "4 / 5" }}>
@@ -418,7 +465,7 @@ export default function Wizard({ collections, templates, initialTema, initialSte
                 </label>
                 {alternarCores && (
                   <div className="mt-3 flex items-center gap-3">
-                    <ColorRow label="Fundo alt." value={cFundo2} onChange={setCFundo2} />
+                    <ColorRow label="Fundo alt." value={cFundo2} onChange={manual(setCFundo2)} />
                     {/* mini preview do ritmo */}
                     <div className="ml-auto flex gap-1">
                       {[cFundo, cFundo2, cFundo, cFundo2].map((c, i) => (

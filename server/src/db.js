@@ -34,10 +34,11 @@ CREATE TABLE IF NOT EXISTS templates (
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS collections (
-  id    TEXT PRIMARY KEY,
-  name  TEXT NOT NULL,
-  color TEXT,
-  brief TEXT                          -- markdown: personalidade/voz da marca (alimenta a IA)
+  id       TEXT PRIMARY KEY,
+  name     TEXT NOT NULL,
+  color    TEXT,
+  brief    TEXT,                      -- markdown: personalidade/voz da marca (alimenta a IA)
+  identity TEXT                       -- JSON BrandIdentity: cores/fontes da marca
 );
 CREATE TABLE IF NOT EXISTS media (
   hash       TEXT PRIMARY KEY,        -- sha256(conteúdo) truncado
@@ -54,12 +55,13 @@ CREATE TABLE IF NOT EXISTS daily_trends (
 );
 `);
 
-// migração leve: bancos criados antes do campo `brief` (personalidade da marca)
+// migração leve: bancos criados antes de `brief` (personalidade) / `identity` (cores da marca)
 try {
   const cols = db.prepare("PRAGMA table_info(collections)").all().map((c) => c.name);
   if (!cols.includes("brief")) db.exec("ALTER TABLE collections ADD COLUMN brief TEXT");
+  if (!cols.includes("identity")) db.exec("ALTER TABLE collections ADD COLUMN identity TEXT");
 } catch (e) {
-  console.error("[db] migração collections.brief:", e.message);
+  console.error("[db] migração collections:", e.message);
 }
 
 // Banco de usuários do Publisher — SOMENTE LEITURA (login/consultas).

@@ -217,12 +217,29 @@ export interface Template {
   counter?: CarouselCounter;
 }
 
+/**
+ * Identidade visual salva de uma marca/cliente. Fica na coleção e é reaproveitada
+ * na criação do carrossel (wizard) — evita redigitar as cores toda vez.
+ */
+export interface BrandIdentity {
+  bg: string; // fundo
+  text: string; // título
+  muted: string; // subtítulo
+  accent: string; // destaque
+  bgAlt?: string; // fundo alternado (slides 2, 4, 6…)
+  /** chave de FONT_PAIRS (config/fontPairs) — vazio = padrão do modelo */
+  fontPair?: string;
+  handle?: string; // @ do Instagram
+}
+
 export interface Collection {
   id: string;
   name: string;
   color: string;
   /** Markdown com a personalidade/briefing da marca — alimenta a IA na geração. */
   brief?: string | null;
+  /** Cores/fontes da marca — puxadas no wizard ao escolher este cliente. */
+  identity?: BrandIdentity | null;
 }
 
 let counter = 0;

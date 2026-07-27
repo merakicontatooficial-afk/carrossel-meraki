@@ -1,7 +1,7 @@
 // Cliente do backend (server/). Em dev, o Vite faz proxy de /api → :8787.
 // Persistência é COMPARTILHADA (servidor): login por email+senha (usuários do
 // Meraki Publisher), carrosséis/templates/coleções da equipe, mídia em disco.
-import type { BrandKit, Carousel, Collection, Slide, Template } from "../types";
+import type { BrandIdentity, BrandKit, Carousel, Collection, Slide, Template } from "../types";
 import { compressCarouselMedia, compressTemplateMedia } from "./imagePrep";
 
 export interface BrandVoice {
@@ -111,7 +111,7 @@ export const api = {
   // ── coleções (clientes) ──
   listCollections: () => get<Collection[]>("/api/collections"),
   createCollection: (c: Collection) => post<Collection>("/api/collections", c),
-  updateCollection: (id: string, b: { name?: string; color?: string; brief?: string | null }) => req<Collection>(`/api/collections/${id}`, "PATCH", b),
+  updateCollection: (id: string, b: { name?: string; color?: string; brief?: string | null; identity?: BrandIdentity | null }) => req<Collection>(`/api/collections/${id}`, "PATCH", b),
   deleteCollection: (id: string) => req<{ ok: boolean }>(`/api/collections/${id}`, "DELETE"),
 
   // ── IA (protegida) ──

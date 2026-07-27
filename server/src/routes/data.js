@@ -100,28 +100,32 @@ router.delete("/templates/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-// ===== coleções (clientes) + personalidade da marca (brief .md) =====
-router.get("/collections", (_req, res) => res.json(db.prepare("SELECT * FROM collections ORDER BY name").all()));
+// ===== coleções (clientes) + personalidade (brief .md) + identidade visual (cores) =====
+router.get("/collections", (_req, res) =>
+  res.json(db.prepare("SELECT * FROM collections ORDER BY name").all().map(rowToCollection))
+);
 
 router.post("/collections", (req, res) => {
-  const { id, name, color, brief } = req.body || {};
+  const { id, name, color, brief, identity } = req.body || {};
   const cid = id || randomUUID();
-  db.prepare("INSERT OR REPLACE INTO collections (id, name, color, brief) VALUES (?,?,?,?)").run(cid, name || "Coleção", color || "#5103c1", brief ?? null);
-  res.json({ id: cid, name, color, brief: brief ?? null });
+  db.prepare("INSERT OR REPLACE INTO collections (id, name, color, brief, identity) VALUES (?,?,?,?,?)")
+    .run(cid, name || "Coleção", color || "#5103c1", brief ?? null, identity ? JSON.stringify(identity) : null);
+  res.json(rowToCollection(db.prepare("SELECT * FROM collections WHERE id = ?").get(cid)));
 });
 
-/** PATCH /collections/:id — atualiza nome/cor/brief (personalidade da marca). */
+/** PATCH /collections/:id — atualiza nome/cor/brief/identidade visual da marca. */
 router.patch("/collections/:id", (req, res) => {
   const cur = db.prepare("SELECT * FROM collections WHERE id = ?").get(req.params.id);
   if (!cur) return res.status(404).json({ error: "coleção não encontrada" });
-  const { name, color, brief } = req.body || {};
-  db.prepare("UPDATE collections SET name = ?, color = ?, brief = ? WHERE id = ?").run(
+  const { name, color, brief, identity } = req.body || {};
+  db.prepare("UPDATE collections SET name = ?, color = ?, brief = ?, identity = ? WHERE id = ?").run(
     name ?? cur.name,
     color ?? cur.color,
     brief !== undefined ? brief : cur.brief,
+    identity !== undefined ? (identity ? JSON.stringify(identity) : null) : cur.identity,
     req.params.id
   );
-  res.json(db.prepare("SELECT * FROM collections WHERE id = ?").get(req.params.id));
+  res.json(rowToCollection(db.prepare("SELECT * FROM collections WHERE id = ?").get(req.params.id)));
 });
 
 router.delete("/collections/:id", (req, res) => {
@@ -141,6 +145,13 @@ function rowToCarousel(r) {
   c.status = r.status;
   c.updatedAt = r.updated_at;
   return c;
+}
+function rowToCollection(r) {
+  let identity = null;
+  try {
+    identity = r.identity ? JSON.parse(r.identity) : null;
+  } catch { /* JSON corrompido: trata como sem identidade */ }
+  return { id: r.id, name: r.name, color: r.color, brief: r.brief ?? null, identity };
 }
 function rowToTemplate(r) {
   const t = JSON.parse(r.data);

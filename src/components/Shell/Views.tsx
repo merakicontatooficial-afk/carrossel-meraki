@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
-import type { Collection, Template } from "../../types";
+import type { BrandIdentity, Collection, Template } from "../../types";
 import { api, type TrendItem, type AcessoUser } from "../../lib/api";
-import { FileButton } from "../ui";
-import { FolderPlus, Trash2, TrendingUp, Settings, LayoutTemplate, Copy, Search, Loader2, Sparkles, ArrowRight, Flame, RefreshCw, Users, ShieldCheck, UserPlus, KeyRound, FileText, Upload, X } from "lucide-react";
+import { ColorInput, FileButton, Select } from "../ui";
+import { DEFAULT_IDENTITY } from "../../config/kits";
+import { FONT_PAIRS, FONT_PAIR_AUTO } from "../../config/fontPairs";
+import { extractPalette } from "../../lib/palette";
+import { FolderPlus, Trash2, TrendingUp, Settings, LayoutTemplate, Copy, Search, Loader2, Sparkles, ArrowRight, Flame, RefreshCw, Users, ShieldCheck, UserPlus, KeyRound, FileText, Upload, X, Palette } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function Placeholder({ icon, title, note }: { icon: ReactNode; title: string; note: string }) {
@@ -336,16 +339,112 @@ function BriefEditor({ col, onSave, onClose }: { col: Collection; onSave: (brief
   );
 }
 
+/** Editor da identidade visual (cores/fontes) de um cliente — o wizard puxa daqui. */
+function IdentityEditor({ col, onSave, onClose }: { col: Collection; onSave: (identity: BrandIdentity | null) => void; onClose: () => void }) {
+  const [id, setId] = useState<BrandIdentity>(col.identity ?? { ...DEFAULT_IDENTITY });
+  const [salvo, setSalvo] = useState(false);
+  const set = (patch: Partial<BrandIdentity>) => { setId((cur) => ({ ...cur, ...patch })); setSalvo(false); };
+
+  const linha = (label: string, value: string, onChange: (v: string) => void) => (
+    <div className="flex items-center gap-2">
+      <span className="w-24 shrink-0 text-[11px] text-[var(--text-md)]">{label}</span>
+      <ColorInput value={value} onChange={onChange} />
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={onClose}>
+      <div className="glass flex max-h-[88vh] w-full max-w-2xl flex-col overflow-y-auto !rounded-[22px] p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center gap-2">
+          <Palette size={18} className="text-[var(--brand-hi)]" />
+          <h3 className="mr-auto text-sm font-semibold text-white">Identidade visual · {col.name}</h3>
+          <button onClick={onClose} className="text-[var(--text-lo)] hover:text-white"><X size={18} /></button>
+        </div>
+        <p className="mb-4 text-xs leading-relaxed text-[var(--text-md)]">
+          Defina as cores da marca uma vez. Ao criar um carrossel para este cliente, o wizard já vem com elas preenchidas.
+        </p>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2.5">
+            {linha("Fundo", id.bg, (bg) => set({ bg }))}
+            {linha("Título", id.text, (text) => set({ text }))}
+            {linha("Subtítulo", id.muted, (muted) => set({ muted }))}
+            {linha("Destaque", id.accent, (accent) => set({ accent }))}
+            {linha("Fundo alt.", id.bgAlt ?? "", (v) => set({ bgAlt: v || undefined }))}
+            <p className="text-[11px] leading-relaxed text-[var(--text-lo)]">
+              <b className="text-[var(--text-md)]">Fundo alt.</b> é o fundo dos slides 2, 4, 6… quando você liga "Alternar cores" no wizard. Deixe vazio se a marca não usa.
+            </p>
+          </div>
+
+          {/* preview ao vivo */}
+          <div className="flex flex-col justify-end rounded-xl p-4" style={{ background: id.bg, aspectRatio: "4 / 5" }}>
+            <div style={{ fontFamily: "Poppins", fontWeight: 800, fontSize: 22, color: id.text, lineHeight: 1.1 }}>
+              Título do <span style={{ color: id.accent }}>post</span>
+            </div>
+            <div style={{ fontSize: 12, color: id.muted, marginTop: 4 }}>Subtítulo de exemplo</div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs text-[var(--text-md)]">Combinação de fontes</span>
+            <Select
+              value={id.fontPair ?? FONT_PAIR_AUTO}
+              onChange={(v) => set({ fontPair: v === FONT_PAIR_AUTO ? undefined : v })}
+              options={Object.keys(FONT_PAIRS).map((k) => ({ value: k, label: k }))}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs text-[var(--text-md)]">@ do Instagram (opcional)</span>
+            <input
+              value={id.handle ?? ""}
+              onChange={(e) => set({ handle: e.target.value || undefined })}
+              placeholder="@perfildocliente"
+              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 border-t border-white/8 pt-3">
+          <FileButton
+            label={<><Palette size={13} /> Extrair cores de uma imagem (logo, print do feed…)</>}
+            onFile={async (dataUrl) => {
+              const p = await extractPalette(dataUrl);
+              set({ bg: p.bg, text: p.text, accent: p.accent });
+            }}
+          />
+        </div>
+
+        <div className="mt-4 flex items-center gap-2">
+          {salvo && <span className="text-[12px] text-emerald-300">Salvo ✓</span>}
+          {col.identity && (
+            <button
+              className="btn btn-danger !min-h-0 !py-2"
+              onClick={() => { if (confirm("Remover a identidade visual deste cliente?")) { onSave(null); onClose(); } }}
+            >
+              <Trash2 size={13} /> Remover
+            </button>
+          )}
+          <button className="btn ml-auto !min-h-0 !py-2" onClick={onClose}>Fechar</button>
+          <button className="btn btn-primary !min-h-0 !py-2" onClick={() => { onSave(id); setSalvo(true); }}>Salvar identidade</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OrganizacaoView({
-  collections, counts, onCreate, onDelete, onSaveBrief,
+  collections, counts, onCreate, onDelete, onSaveBrief, onSaveIdentity,
 }: {
   collections: Collection[];
   counts: Record<string, number>;
   onCreate: () => void;
   onDelete: (id: string) => void;
   onSaveBrief?: (id: string, brief: string) => void;
+  onSaveIdentity?: (id: string, identity: BrandIdentity | null) => void;
 }) {
   const [editing, setEditing] = useState<Collection | null>(null);
+  const [editingId, setEditingId] = useState<Collection | null>(null);
   return (
     <div className="mx-auto max-w-6xl px-8 py-8">
       {editing && onSaveBrief && (
@@ -355,17 +454,25 @@ export function OrganizacaoView({
           onSave={(brief) => { onSaveBrief(editing.id, brief); setEditing({ ...editing, brief }); }}
         />
       )}
+      {editingId && onSaveIdentity && (
+        <IdentityEditor
+          col={editingId}
+          onClose={() => setEditingId(null)}
+          onSave={(identity) => { onSaveIdentity(editingId.id, identity); setEditingId({ ...editingId, identity }); }}
+        />
+      )}
       <div className="mb-6 flex items-center gap-3">
         <h1 className="mr-auto text-xl font-bold text-white">Organização</h1>
         <button className="btn btn-primary" onClick={onCreate}><FolderPlus size={15} /> Novo cliente</button>
       </div>
-      <p className="mb-6 text-sm text-white/50">Cada cliente é uma coleção com o <b className="text-white/70">dossiê da marca</b> (.md). Ao gerar um carrossel, escolha o cliente — a IA escreve na personalidade dele.</p>
+      <p className="mb-6 text-sm text-white/50">Cada cliente é uma coleção com o <b className="text-white/70">dossiê da marca</b> (.md) e a <b className="text-white/70">identidade visual</b> (cores). Ao gerar um carrossel, escolha o cliente — a IA escreve na personalidade dele e as cores já vêm preenchidas.</p>
       {collections.length === 0 ? (
         <div className="glass py-16 text-center text-sm text-white/45">Nenhum cliente ainda. Crie o primeiro.</div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {collections.map((c) => {
             const temBrief = !!(c.brief && c.brief.trim());
+            const idv = c.identity;
             return (
               <div key={c.id} className="glass flex flex-col gap-3 p-4">
                 <div className="flex items-center gap-3">
@@ -384,6 +491,22 @@ export function OrganizacaoView({
                     <FileText size={13} />
                     <span className="mr-auto">{temBrief ? "Dossiê da marca ✓" : "Adicionar dossiê (.md)"}</span>
                     {temBrief && <span className="text-[10px] opacity-70">{Math.round((c.brief!.length / 1000))}k</span>}
+                  </button>
+                )}
+                {onSaveIdentity && (
+                  <button
+                    onClick={() => setEditingId(c)}
+                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[12px] transition ${idv ? "border-[var(--brand-sat)]/40 bg-[var(--brand-sat)]/12 text-[var(--brand-hi)] hover:bg-[var(--brand-sat)]/20" : "border-white/10 text-[var(--text-md)] hover:text-white"}`}
+                  >
+                    <Palette size={13} />
+                    <span className="mr-auto">{idv ? "Identidade visual ✓" : "Definir identidade visual"}</span>
+                    {idv && (
+                      <span className="flex gap-1">
+                        {[idv.bg, idv.text, idv.muted, idv.accent].map((cor, i) => (
+                          <span key={i} className="h-3.5 w-3.5 rounded-full border border-white/20" style={{ background: cor }} />
+                        ))}
+                      </span>
+                    )}
                   </button>
                 )}
               </div>

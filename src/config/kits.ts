@@ -1,4 +1,4 @@
-import type { BrandKit } from "../types";
+import type { BrandIdentity, BrandKit } from "../types";
 
 // Brand kits. Os dois "Livre" replicam a linhagem visual dos carrosséis virais
 // do MyPostFlow (referências em refs/): nascem destravados — liberdade total.
@@ -118,6 +118,19 @@ export const KITS: BrandKit[] = [
     eyebrow: "pill-index",
   },
 ];
+
+/** Cores que o wizard usa quando nenhuma identidade visual foi escolhida. */
+export const DEFAULT_IDENTITY: BrandIdentity = {
+  bg: "#0A0A0B",
+  text: "#FFFFFF",
+  muted: "#A8A8A8",
+  accent: "#7C5CFF",
+};
+
+/** Identidade visual equivalente a um kit do app (Meraki, G2D…). */
+export function kitToIdentity(k: BrandKit): BrandIdentity {
+  return { bg: k.bg, text: k.text, muted: k.muted, accent: k.accent };
+}
 
 export function getKit(id: string, customKits: BrandKit[] = []): BrandKit {
   return (

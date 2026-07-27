@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { BrandKit, Carousel, CarouselCounter, Collection, Slide, Template } from "./types";
+import type { BrandIdentity, BrandKit, Carousel, CarouselCounter, Collection, Slide, Template } from "./types";
 import { uid } from "./types";
 import { getKit } from "./config/kits";
 import { cloneSlides } from "./lib/clone";
@@ -232,6 +232,16 @@ export default function App() {
     }
   };
 
+  // identidade visual (cores/fontes) da marca — puxada no wizard ao escolher o cliente
+  const saveIdentity = async (id: string, identity: BrandIdentity | null) => {
+    setCollections((all) => all.map((c) => (c.id === id ? { ...c, identity } : c)));
+    try {
+      await api.updateCollection(id, { identity });
+    } catch (e) {
+      alert("Falha ao salvar a identidade visual: " + (e as Error).message);
+    }
+  };
+
   const deleteCollection = async (id: string) => {
     setCollections((all) => all.filter((c) => c.id !== id));
     setCarousels((all) => all.map((c) => (c.collectionId === id ? { ...c, collectionId: undefined } : c)));
@@ -343,6 +353,7 @@ export default function App() {
             onCreate={createCollection}
             onDelete={deleteCollection}
             onSaveBrief={saveBrief}
+            onSaveIdentity={saveIdentity}
           />
         )}
         {view === "config" && <ConfigView isDono={!!usuario.dono} />}
