@@ -129,17 +129,36 @@ export default function Editor({
 
   const replaceElements = (elements: Element[]) => patchSlide(safeIndex, { elements });
 
-  // --- copiar / colar elementos entre slides (mesma posição), 1 ou vários ---
+  // --- copiar / colar elementos (mesma posição), 1 ou vários ---
+  // A área de transferência vive no localStorage: funciona entre slides, entre
+  // CARROSSÉIS diferentes e entre ABAS do navegador. As cores usam tokens da
+  // marca, então o que é colado se adapta ao kit do carrossel de destino.
+  const CLIP_KEY = "cg.clipboard.v1";
   const clipboard = useRef<Element[]>([]);
   const alvos = (id?: string | null) => (id ? [id] : selectedIds);
+
+  const lerClipboard = (): Element[] => {
+    try {
+      const raw = localStorage.getItem(CLIP_KEY);
+      if (raw) return JSON.parse(raw) as Element[];
+    } catch { /* json inválido */ }
+    return clipboard.current;
+  };
 
   const copyElement = (id?: string | null) => {
     const ids = alvos(id);
     const els = slide.elements.filter((e) => ids.includes(e.id));
-    if (els.length) clipboard.current = structuredClone(els);
+    if (!els.length) return;
+    clipboard.current = structuredClone(els);
+    try {
+      localStorage.setItem(CLIP_KEY, JSON.stringify(clipboard.current));
+    } catch {
+      // imagem recém-gerada (dataURL) pode estourar a cota — segue só em memória
+      console.warn("clipboard grande demais p/ compartilhar entre abas; copiado só neste editor");
+    }
   };
   const pasteElement = () => {
-    const src = clipboard.current;
+    const src = lerClipboard();
     if (!src.length) return;
     const maxZ = Math.max(0, ...slide.elements.map((e) => e.z));
     // mesma x/y de origem; ids novos pra poderem coexistir
@@ -399,7 +418,7 @@ export default function Editor({
           <div className="glass fixed z-[61] w-52 overflow-hidden !rounded-xl py-1 text-sm" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
             {[
               { label: "Copiar", hint: "Ctrl+C", fn: () => copyElement(ctxMenu.id) },
-              { label: "Colar aqui", hint: "Ctrl+V", fn: pasteElement, off: !clipboard.current },
+              { label: "Colar aqui", hint: "Ctrl+V", fn: pasteElement, off: lerClipboard().length === 0 },
               { label: "Duplicar", hint: "Ctrl+D", fn: () => { copyElement(ctxMenu.id); pasteElement(); } },
             ].map((o) => (
               <button key={o.label} disabled={o.off} onClick={() => { o.fn(); setCtxMenu(null); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[var(--text-md)] hover:bg-white/8 hover:text-white disabled:opacity-40">
