@@ -89,13 +89,19 @@ export async function generateText({ prompt, system, temperature = 0.8 }) {
  * rosto/produto de referência. `hq: true` usa Nano Banana Pro (4K, pago).
  * Retorna { dataUrl } pronto pra virar bgImage do slide.
  */
-export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", hq = false }) {
+export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, hq = false }) {
   assertKey();
   const model = hq ? MODELS.imagePro : MODELS.image;
 
   const parts = [{ text: prompt }];
-  if (refImageBase64) {
-    parts.push({ inlineData: { mimeType: refMime, data: refImageBase64 } });
+  // múltiplas referências (até 3): rosto, produto, estilo… `refs` = [{ data, mime }]
+  const lista = Array.isArray(refs) && refs.length
+    ? refs
+    : refImageBase64
+      ? [{ data: refImageBase64, mime: refMime }]
+      : [];
+  for (const r of lista.slice(0, 3)) {
+    if (r?.data) parts.push({ inlineData: { mimeType: r.mime || "image/jpeg", data: r.data } });
   }
 
   const res = await ai.models.generateContent({

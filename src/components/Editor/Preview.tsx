@@ -12,8 +12,10 @@ interface Props {
   manualMode: boolean;
   showGrid?: boolean;
   selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedIds?: string[];
+  onSelect: (id: string | null, additive?: boolean) => void;
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
+  onPatchMany?: (patches: { id: string; patch: Partial<Element> }[]) => void;
   onMoveLogo: (x: number, y: number) => void;
   onMoveCounter: (x: number, y: number) => void;
   onCommit?: () => void;
@@ -28,8 +30,10 @@ export default function Preview({
   manualMode,
   showGrid,
   selectedId,
+  selectedIds,
   onSelect,
   onPatchElement,
+  onPatchMany,
   onMoveLogo,
   onMoveCounter,
   onCommit,
@@ -55,7 +59,7 @@ export default function Preview({
   if (!slide) return null;
 
   const interactive: InteractiveCtx | undefined = manualMode
-    ? { scale, selectedId, onSelect, onPatch: onPatchElement, onMoveLogo, onMoveCounter, onCommit, onContextMenu }
+    ? { scale, selectedId, selectedIds, onSelect, onPatch: onPatchElement, onPatchMany, onMoveLogo, onMoveCounter, onCommit, onContextMenu }
     : undefined;
 
   const prev = () => setIndex(Math.max(0, index - 1));

@@ -6,7 +6,7 @@ import { autoLayout } from "../../lib/aiCarousel";
 import { cloneSlides } from "../../lib/clone";
 import { exportCarousel } from "../../lib/export";
 import { api } from "../../lib/api";
-import { AccordionGroup, Btn, ColorInput, Field, FileButton, NumberInput, Section } from "../ui";
+import { AccordionGroup, Btn, ColorInput, Field, NumberInput, Section } from "../ui";
 import IdentityPanel from "./IdentityPanel";
 import LogoUploader from "./LogoUploader";
 import FramePanel from "./FramePanel";
@@ -15,7 +15,8 @@ import StructuredForm from "./StructuredForm";
 import ManualInspector from "./ManualInspector";
 import Preview from "./Preview";
 import Filmstrip from "./Filmstrip";
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, ImageIcon, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, StretchHorizontal, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
+import AiImageBox, { type AiImageInput } from "./AiImageBox";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, StretchHorizontal, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
 
 /** Botões de alinhar o elemento selecionado no slide (barra superior do Estúdio). */
 const ALIGN_BTNS: { t?: string; i?: React.ReactNode; calc?: (el: Element) => Partial<Element>; sep?: boolean }[] = [
@@ -84,14 +85,22 @@ export default function Editor({
     if (nxt) { h.past.push(carousel); h.key = null; applyChange(nxt); }
   };
   const [manualMode, setManualMode] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // seleção MÚLTIPLA: Shift/Ctrl + clique adiciona/remove. O último da lista é o
+  // "principal" (o que o inspetor edita).
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectedId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
+  const setSelectedId = (id: string | null, additive = false) => {
+    setSelectedIds((cur) => {
+      if (!id) return [];
+      if (!additive) return [id];
+      return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+    });
+  };
   const [exporting, setExporting] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState<string | null>(null);
-  const [imgPrompt, setImgPrompt] = useState("");
   const [refineInstr, setRefineInstr] = useState("");
   const [caption, setCaption] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [refImg, setRefImg] = useState<string | null>(null); // referência p/ gerar imagem (rosto/produto)
 
   const safeIndex = Math.min(index, carousel.slides.length - 1);
   const slide = carousel.slides[safeIndex];
@@ -120,27 +129,41 @@ export default function Editor({
 
   const replaceElements = (elements: Element[]) => patchSlide(safeIndex, { elements });
 
-  // --- copiar / colar elementos entre slides (mesma posição) ---
-  const clipboard = useRef<Element | null>(null);
+  // --- copiar / colar elementos entre slides (mesma posição), 1 ou vários ---
+  const clipboard = useRef<Element[]>([]);
+  const alvos = (id?: string | null) => (id ? [id] : selectedIds);
+
   const copyElement = (id?: string | null) => {
-    const el = slide.elements.find((e) => e.id === (id ?? selectedId));
-    if (el) clipboard.current = structuredClone(el);
+    const ids = alvos(id);
+    const els = slide.elements.filter((e) => ids.includes(e.id));
+    if (els.length) clipboard.current = structuredClone(els);
   };
   const pasteElement = () => {
     const src = clipboard.current;
-    if (!src) return;
+    if (!src.length) return;
     const maxZ = Math.max(0, ...slide.elements.map((e) => e.z));
-    const copy: Element = { ...structuredClone(src), id: uid(), z: maxZ + 1 }; // mesma x/y
+    // mesma x/y de origem; ids novos pra poderem coexistir
+    const copias: Element[] = src.map((e, i) => ({ ...structuredClone(e), id: uid(), z: maxZ + 1 + i }));
     commitHistory();
-    patchSlide(safeIndex, { elements: [...slide.elements, copy] });
-    setSelectedId(copy.id);
+    patchSlide(safeIndex, { elements: [...slide.elements, ...copias] });
+    setSelectedIds(copias.map((c) => c.id));
   };
   const deleteElement = (id?: string | null) => {
-    const target = id ?? selectedId;
-    if (!target) return;
+    const ids = alvos(id);
+    if (!ids.length) return;
     commitHistory();
-    patchSlide(safeIndex, { elements: slide.elements.filter((e) => e.id !== target) });
-    setSelectedId(null);
+    patchSlide(safeIndex, { elements: slide.elements.filter((e) => !ids.includes(e.id)) });
+    setSelectedIds([]);
+  };
+
+  /** aplica um patch a vários elementos de uma vez (arrastar grupo, alinhar grupo). */
+  const patchMany = (patches: { id: string; patch: Partial<Element> }[]) => {
+    if (!patches.length) return;
+    const mapa = new Map(patches.map((p) => [p.id, p.patch]));
+    const slides = carousel.slides.map((s, j) =>
+      j === safeIndex ? { ...s, elements: s.elements.map((e) => (mapa.has(e.id) ? { ...e, ...mapa.get(e.id) } : e)) } : s
+    );
+    onChange({ ...carousel, slides }, `many:${patches.map((p) => p.id).join(",")}`);
   };
 
   // atalhos: undo/redo + copiar/colar (ignora quando está digitando num campo)
@@ -163,18 +186,17 @@ export default function Editor({
         arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1],
       };
       const dir = SETAS[k];
-      if (dir && selectedId) {
+      if (dir && selectedIds.length) {
         e.preventDefault();
-        const alvo = carousel.slides[safeIndex]?.elements.find((x) => x.id === selectedId);
-        if (!alvo) return;
         const passo = e.shiftKey ? 10 : 1;
-        patchElement(selectedId, { x: alvo.x + dir[0] * passo, y: alvo.y + dir[1] * passo });
+        const els = carousel.slides[safeIndex]?.elements.filter((x) => selectedIds.includes(x.id)) ?? [];
+        patchMany(els.map((x) => ({ id: x.id, patch: { x: x.x + dir[0] * passo, y: x.y + dir[1] * passo } })));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carousel, selectedId, safeIndex]);
+  }, [carousel, selectedIds, safeIndex]);
 
   // --- operações de slide (filmstrip) ---
   const duplicateSlide = (i: number) => {
@@ -228,21 +250,14 @@ export default function Editor({
     body: s.elements.find((e) => e.role === "body")?.text ?? "",
   });
 
-  // referência opcional (rosto/produto) enviada junto com o prompt
-  const refPayload = () => {
-    if (!refImg) return {};
-    const [head, b64] = refImg.split(",");
-    return { refImageBase64: b64, refMime: /data:(.*?);/.exec(head)?.[1] || "image/jpeg" };
-  };
-
-  const genImage = async () => {
+  // gera a FOTO DE FUNDO do slide (prompt + até 3 referências)
+  const genImage = async ({ prompt, refs }: AiImageInput) => {
     setAiBusy("Gerando imagem…");
     try {
-      const prompt = imgPrompt.trim() || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt, ...refPayload() });
+      const p = prompt || slideText(slide).headline || carousel.name;
+      const img = await api.generateImage({ prompt: p, refs });
       commitHistory();
-      patchSlide(safeIndex, { bgImage: img.dataUrl, bgScale: 1, scrim: slide.scrim ?? 70 });
-      setImgPrompt("");
+      patchSlide(safeIndex, { bgImage: img.dataUrl, bgScale: 1, scrim: slide.scrim ?? 96, scrimPos: slide.scrimPos ?? 62 });
     } catch (e) {
       alert("Falha ao gerar imagem: " + (e as Error).message);
     } finally {
@@ -250,12 +265,12 @@ export default function Editor({
     }
   };
 
-  // gera imagem por IA DENTRO de um elemento de imagem (cartão/retângulo) — não só fundo
-  const genImageElement = async (elId: string, prompt?: string) => {
+  // gera imagem por IA DENTRO de um elemento de imagem (cartão/retângulo)
+  const genImageElement = async (elId: string, input?: AiImageInput) => {
     setAiBusy("Gerando imagem…");
     try {
-      const p = (prompt ?? "").trim() || imgPrompt.trim() || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt: p, ...refPayload() });
+      const p = input?.prompt || slideText(slide).headline || carousel.name;
+      const img = await api.generateImage({ prompt: p, refs: input?.refs });
       commitHistory();
       patchElement(elId, { src: img.dataUrl });
     } catch (e) {
@@ -322,7 +337,7 @@ export default function Editor({
           <button className={`icon-btn btn ${showGrid ? "!border-transparent !bg-[var(--brand-sat)] !text-white" : ""}`} onClick={() => setShowGrid((g) => !g)} title="Grade de posicionamento"><Grid3x3 size={15} /></button>
         </div>
 
-        {/* alinhamento do elemento selecionado (ativa ao clicar num elemento) */}
+        {/* alinhamento — vale para todos os elementos selecionados */}
         <div className="flex items-center gap-1 border-l border-white/10 pl-2" title={selEl ? undefined : "Selecione um elemento na prévia para alinhar"}>
           {ALIGN_BTNS.map((b, i) =>
             b.sep ? (
@@ -332,12 +347,19 @@ export default function Editor({
                 key={i}
                 title={b.t}
                 disabled={!selEl}
-                onClick={() => selEl && patchElement(selEl.id, b.calc!(selEl))}
+                onClick={() => {
+                  const els = slide.elements.filter((e) => selectedIds.includes(e.id));
+                  commitHistory();
+                  patchMany(els.map((e) => ({ id: e.id, patch: b.calc!(e) })));
+                }}
                 className="icon-btn btn disabled:opacity-30"
               >
                 {b.i}
               </button>
             )
+          )}
+          {selectedIds.length > 1 && (
+            <span className="ml-1 rounded-full bg-[var(--brand-sat)]/25 px-2 py-0.5 text-[11px] text-[var(--brand-hi)]">{selectedIds.length} selecionados</span>
           )}
         </div>
 
@@ -428,6 +450,7 @@ export default function Editor({
             <ManualInspector
               slide={slide}
               selectedId={selectedId}
+              selectedIds={selectedIds}
               onSelect={setSelectedId}
               onPatchElement={patchElement}
               onReplaceElements={replaceElements}
@@ -446,31 +469,7 @@ export default function Editor({
           )}
 
           <Section title="IA · slide atual" icon={<Sparkles size={15} />} defaultOpen>
-            <Field label="Gerar imagem de fundo com IA">
-              <input
-                value={imgPrompt}
-                onChange={(e) => setImgPrompt(e.target.value)}
-                placeholder="Descreva a imagem (ou deixe vazio p/ usar o título)"
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]"
-              />
-            </Field>
-            {/* referência de rosto/produto — a IA usa a foto como base */}
-            <div className="mb-3">
-              <div className="mb-1.5 text-xs text-[var(--text-md)]">Imagem de referência — rosto/produto (opcional)</div>
-              {refImg ? (
-                <div className="flex items-center gap-2">
-                  <img src={refImg} alt="referência" className="h-12 w-12 rounded-lg object-cover" />
-                  <FileButton label="Trocar" onFile={setRefImg} />
-                  <Btn variant="danger" onClick={() => setRefImg(null)} title="Remover referência"><X size={13} /></Btn>
-                </div>
-              ) : (
-                <FileButton label={<><ImageIcon size={13} /> Subir referência</>} onFile={setRefImg} />
-              )}
-              <p className="mt-1 text-[11px] text-[var(--text-lo)]">Vale pro fundo e pros cartões de imagem deste slide.</p>
-            </div>
-            <button className="btn btn-primary w-full" onClick={genImage} disabled={!!aiBusy}>
-              <ImageIcon size={14} /> Gerar imagem de fundo
-            </button>
+            <AiImageBox titulo="Gerar imagem de fundo" busy={!!aiBusy} onGenerate={genImage} />
             <div className="my-3 h-px bg-white/8" />
             <Field label="Refinar o título com IA">
               <input
@@ -676,8 +675,10 @@ export default function Editor({
             manualMode={manualMode}
             showGrid={showGrid}
             selectedId={selectedId}
+            selectedIds={selectedIds}
             onSelect={setSelectedId}
             onPatchElement={patchElement}
+            onPatchMany={patchMany}
             onCommit={commitHistory}
             onContextMenu={(id, x, y) => setCtxMenu({ id, x, y })}
             onMoveLogo={(x, y) =>

@@ -102,12 +102,14 @@ function photoSlide(ai: AiSlide, i: number, reserve = 0): Slide {
 // ── SLIDE COM CARTÃO DE IMAGEM HORIZONTAL (retângulo largo, estilo MyPostFlow) ─
 // A capa usa foto de fundo; slides de conteúdo usam o cartão largo (paisagem).
 // imgPos "base" (padrão) = texto em cima, imagem embaixo · "top" = imagem em cima.
-function cardSlide(ai: AiSlide, opts?: { light?: { bg: string; text: string; muted: string; accent: string }; imgPos?: "top" | "base"; reserve?: number }): Slide {
+function cardSlide(ai: AiSlide, opts?: { light?: { bg: string; text: string; muted: string; accent: string }; imgPos?: "top" | "base"; reserve?: number; isCover?: boolean }): Slide {
   const light = opts?.light;
   const imgPos = opts?.imgPos ?? "base";
   const reserve = opts?.reserve ?? 0;
+  const isCover = !!opts?.isCover;
   const imgH = 520; // 920×520 = paisagem (horizontal)
-  const hlH = estTextH(ai.headline, 50, 1.06, W, true);
+  const hlSize = isCover ? 62 : 50;
+  const hlH = estTextH(ai.headline, hlSize, 1.06, W, true);
   const bH = ai.body ? estTextH(ai.body, 32, 1.45, W) : 0;
   const bottom = BOTTOM - reserve;
   const tColor = light?.text ?? "text";
@@ -118,15 +120,15 @@ function cardSlide(ai: AiSlide, opts?: { light?: { bg: string; text: string; mut
   if (imgPos === "top") {
     let y = 240;
     els.push(img(y)); y += imgH + 40;
-    els.push(headline({ text: ai.headline, y, size: 50, h: hlH, up: true, weight: 800, color: tColor, lh: 1.06 })); y += hlH + 20;
+    els.push(headline({ text: ai.headline, y, size: hlSize, h: hlH, up: true, weight: 800, color: tColor, lh: 1.06 })); y += hlH + 20;
     if (ai.body) els.push(bodyEl({ text: ai.body, y, h: bH, size: 32, color: mColor }));
   } else {
     let y = 240;
-    els.push(headline({ text: ai.headline, y, size: 50, h: hlH, up: true, weight: 800, color: tColor, lh: 1.06 })); y += hlH + 20;
+    els.push(headline({ text: ai.headline, y, size: hlSize, h: hlH, up: true, weight: 800, color: tColor, lh: 1.06 })); y += hlH + 20;
     if (ai.body) els.push(bodyEl({ text: ai.body, y, h: bH, size: 32, color: mColor }));
     els.push(img(bottom - imgH)); // ancorado embaixo, acima da reserva do marcador
   }
-  return slide("value", els, { imgPos, ...(light ? { colors: { locked: false, bg: light.bg, text: light.text, accent: light.accent } } : {}) });
+  return slide(isCover ? "cover" : "value", els, { imgPos, ...(light ? { colors: { locked: false, bg: light.bg, text: light.text, accent: light.accent } } : {}) });
 }
 
 // paleta clara por modelo (para o cartão manter a coerência de Creators/TechViral)
@@ -251,10 +253,11 @@ export function modeloCounter(modelo: AiModelo): CarouselCounter | undefined {
  * - Demais modelos: CAPA (slide 1) usa foto de fundo full-bleed; slides de conteúdo
  *   usam o cartão de imagem HORIZONTAL (retângulo largo) com o texto no topo.
  */
-export function aiToSlides(ai: AiCarousel, modelo: AiModelo, opts?: { imageSlides?: number[]; brandName?: string; imgPos?: "top" | "base" }): Slide[] {
+export function aiToSlides(ai: AiCarousel, modelo: AiModelo, opts?: { imageSlides?: number[]; brandName?: string; imgPos?: "top" | "base"; imgKind?: "cartao" | "fundo" }): Slide[] {
   const imageSlides = opts?.imageSlides ?? [];
   const brandName = opts?.brandName ?? "";
   const imgPos = opts?.imgPos ?? "base";
+  const imgKind = opts?.imgKind ?? "cartao"; // cartão = padrão (retângulo em TODOS os slides marcados)
   // marcador na base? então reserva espaço p/ ele nos slides com imagem (auto-diagrama)
   const counter = modeloCounter(modelo);
   const baseCounter = !!counter && counter.style !== "none" && ["bc", "bl", "br"].includes(counter.pos);
@@ -262,7 +265,12 @@ export function aiToSlides(ai: AiCarousel, modelo: AiModelo, opts?: { imageSlide
     const wantsImage = imageSlides.includes(i + 1) && s.kind !== "cta";
     const reserve = baseCounter && !(counter!.hideOnCover && i === 0) ? COUNTER_RESERVE : 0;
     if (modelo === "profile") return profile(s, i, brandName, wantsImage);
-    if (wantsImage) return i === 0 ? photoSlide(s, i, reserve) : cardSlide(s, { light: LIGHT[modelo], imgPos, reserve });
+    if (wantsImage) {
+      // "cartao" = retângulo de imagem em TODOS os slides marcados (inclusive a capa)
+      return imgKind === "fundo"
+        ? photoSlide(s, i, reserve)
+        : cardSlide(s, { light: LIGHT[modelo], imgPos, reserve, isCover: i === 0 });
+    }
     switch (modelo) {
       case "techviral": return techviral(s, i);
       case "creators": return creators(s, i);

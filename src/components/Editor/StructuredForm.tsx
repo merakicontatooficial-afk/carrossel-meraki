@@ -2,6 +2,7 @@ import type { Element, Slide, TextRole } from "../../types";
 import { checkText } from "../../config/guardrails";
 import { ACTION_PRESETS, SWIPE_PRESETS, clampCtaY, type CtaPreset } from "../../config/cta";
 import { Field, FileButton, Section, Select, TextArea, Btn, SliderField } from "../ui";
+import AiImageBox, { type AiImageInput } from "./AiImageBox";
 import { ImagePlus, Trash2, Type, Image as ImageIcon, MousePointerClick, Sparkles, AlignVerticalSpaceAround, ArrowUpToLine, ArrowDownToLine } from "lucide-react";
 
 const ROLE_LABELS: Record<TextRole, string> = {
@@ -18,7 +19,7 @@ interface Props {
   slide: Slide;
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
   onPatchSlide: (patch: Partial<Slide>) => void;
-  onGenerateImageEl?: (elId: string) => void;
+  onGenerateImageEl?: (elId: string, input?: AiImageInput) => void;
   onAutoLayout?: (imgPos?: "top" | "base") => void;
   aiBusy?: boolean;
 }
@@ -136,9 +137,18 @@ export default function StructuredForm({ slide, onPatchElement, onPatchSlide, on
                 )}
               </div>
               {onGenerateImageEl && (
-                <button type="button" onClick={() => onGenerateImageEl(el.id)} disabled={aiBusy} className="btn btn-primary mb-2 w-full !py-2 text-xs">
-                  <Sparkles size={13} /> Gerar imagem com IA
-                </button>
+                <div className="mb-2 rounded-lg border border-white/8 bg-white/[0.03] p-2">
+                  <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-lo)]">
+                    <Sparkles size={12} /> Gerar com IA
+                  </div>
+                  <AiImageBox
+                    compact
+                    titulo="Gerar imagem do cartão"
+                    placeholder="Descreva a imagem deste cartão (vazio = usa o título)"
+                    busy={aiBusy}
+                    onGenerate={(input) => onGenerateImageEl(el.id, input)}
+                  />
+                </div>
               )}
               {el.src && (
                 <>

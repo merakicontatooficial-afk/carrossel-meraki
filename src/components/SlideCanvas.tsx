@@ -36,8 +36,10 @@ export type CanvasMode = "edit" | "preview" | "export";
 export interface InteractiveCtx {
   scale: number;
   selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedIds?: string[]; // seleção múltipla (Shift/Ctrl + clique)
+  onSelect: (id: string | null, additive?: boolean) => void;
   onPatch: (id: string, patch: Partial<Element>) => void;
+  onPatchMany?: (patches: { id: string; patch: Partial<Element> }[]) => void; // mover o grupo junto
   onMoveLogo?: (x: number, y: number) => void; // arrastar o logo cria override no slide
   onMoveCounter?: (x: number, y: number) => void; // arrastar o marcador (global ou override do slide)
   onCommit?: () => void; // fim do gesto → fecha o passo do histórico (undo desfaz o arraste inteiro)
@@ -509,18 +511,26 @@ function ElementView({ el, slide, kit, carousel, slideIndex, mode, interactive, 
     w: number;
     h: number;
     op: "move" | "nw" | "ne" | "sw" | "se";
+    group?: { id: string; x: number; y: number }[] | null; // arrasta a seleção inteira
   } | null>(null);
 
   // logo de texto do kit some quando há logo manual visível
   if (el.role === "logo" && carousel.logo.src && carousel.logo.show) return null;
 
-  const selected = interactive?.selectedId === el.id;
+  const selIds = interactive?.selectedIds ?? (interactive?.selectedId ? [interactive.selectedId] : []);
+  const selected = selIds.includes(el.id);
 
   const beginPointer = (e: React.PointerEvent, op: "move" | "nw" | "ne" | "sw" | "se") => {
     if (!interactive) return;
     e.stopPropagation();
-    interactive.onSelect(el.id);
-    dragRef.current = { px: e.clientX, py: e.clientY, x: el.x, y: el.y, w: el.w, h: el.h, op };
+    const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+    // clicar num item JÁ selecionado (sem modificador) preserva o grupo p/ arrastar junto
+    if (!selected || additive) interactive.onSelect(el.id, additive);
+    const grupo =
+      op === "move" && selIds.length > 1 && selected
+        ? slide.elements.filter((x) => selIds.includes(x.id)).map((x) => ({ id: x.id, x: x.x, y: x.y }))
+        : null;
+    dragRef.current = { px: e.clientX, py: e.clientY, x: el.x, y: el.y, w: el.w, h: el.h, op, group: grupo };
     try {
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     } catch {
@@ -535,6 +545,13 @@ function ElementView({ el, slide, kit, carousel, slideIndex, mode, interactive, 
     const dx = (e.clientX - d.px) / interactive.scale;
     const dy = (e.clientY - d.py) / interactive.scale;
     const thr = 10;
+    // seleção múltipla: move todo o grupo pelo mesmo delta (sem snap, pra não brigar)
+    if (d.op === "move" && d.group && interactive.onPatchMany) {
+      interactive.onPatchMany(
+        d.group.map((g) => ({ id: g.id, patch: { x: Math.round(g.x + dx), y: Math.round(g.y + dy) } }))
+      );
+      return;
+    }
     if (d.op === "move") {
       let nx = d.x + dx;
       let ny = d.y + dy;

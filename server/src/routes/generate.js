@@ -50,11 +50,11 @@ router.post(
 router.post(
   "/image",
   wrap(async (req, res) => {
-    const { prompt, refImageBase64, refMime, hq = false } = req.body || {};
+    const { prompt, refImageBase64, refMime, refs, hq = false } = req.body || {};
     if (!prompt || !String(prompt).trim()) {
       return res.status(400).json({ error: "Informe o 'prompt' da imagem." });
     }
-    const out = await generateImage({ prompt, refImageBase64, refMime, hq: !!hq });
+    const out = await generateImage({ prompt, refImageBase64, refMime, refs, hq: !!hq });
     res.json(out);
   })
 );

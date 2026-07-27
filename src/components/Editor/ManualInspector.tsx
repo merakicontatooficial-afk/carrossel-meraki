@@ -2,6 +2,7 @@ import type { ColorToken, Element, Slide } from "../../types";
 import { uid, CANVAS_W, CANVAS_H, SAFE_MARGIN } from "../../types";
 import { checkText } from "../../config/guardrails";
 import { Btn, ColorInput, Field, FileButton, SliderField, Section, Select, TextArea } from "../ui";
+import AiImageBox, { type AiImageInput } from "./AiImageBox";
 import {
   ArrowDown,
   ArrowUp,
@@ -69,15 +70,17 @@ function TokenColorField({
 interface Props {
   slide: Slide;
   selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  selectedIds?: string[];
+  onSelect: (id: string | null, additive?: boolean) => void;
   onPatchElement: (elId: string, patch: Partial<Element>) => void;
   onReplaceElements: (elements: Element[]) => void;
-  onGenerateImageEl?: (elId: string) => void;
+  onGenerateImageEl?: (elId: string, input?: AiImageInput) => void;
   aiBusy?: boolean;
 }
 
 /** Modo Manual: autonomia total sobre o elemento selecionado. Guardrails viram avisos. */
-export default function ManualInspector({ slide, selectedId, onSelect, onPatchElement, onReplaceElements, onGenerateImageEl, aiBusy }: Props) {
+export default function ManualInspector({ slide, selectedId, selectedIds, onSelect, onPatchElement, onReplaceElements, onGenerateImageEl, aiBusy }: Props) {
+  const selIds = selectedIds ?? (selectedId ? [selectedId] : []);
   const el = slide.elements.find((e) => e.id === selectedId) ?? null;
   const sorted = [...slide.elements].sort((a, b) => b.z - a.z);
 
@@ -154,14 +157,24 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
           </div>
         }
       >
+        {selIds.length > 1 && (
+          <p className="mb-2 rounded-md bg-[var(--brand-sat)]/20 px-2 py-1.5 text-[11px] text-[var(--brand-hi)]">
+            {selIds.length} elementos selecionados — Ctrl+C / Ctrl+V copiam o grupo (inclusive p/ outro slide).
+          </p>
+        )}
         <ul className="space-y-1">
           {sorted.map((e) => (
             <li key={e.id}>
               <button
                 type="button"
-                onClick={() => onSelect(e.id === selectedId ? null : e.id)}
+                title="Shift/Ctrl + clique para selecionar vários"
+                onClick={(ev) => {
+                  const additive = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+                  if (additive) onSelect(e.id, true);
+                  else onSelect(selIds.length === 1 && e.id === selectedId ? null : e.id);
+                }}
                 className={`w-full truncate rounded-md px-2 py-1 text-left text-xs ${
-                  e.id === selectedId ? "bg-[var(--brand-sat)]/25 text-white" : "text-[var(--text-md)] hover:bg-white/5"
+                  selIds.includes(e.id) ? "bg-[var(--brand-sat)]/25 text-white" : "text-[var(--text-md)] hover:bg-white/5"
                 }`}
               >
                 {e.type === "text"
@@ -331,9 +344,12 @@ export default function ManualInspector({ slide, selectedId, onSelect, onPatchEl
                 )}
               </div>
               {onGenerateImageEl && (
-                <button type="button" onClick={() => onGenerateImageEl(el.id)} disabled={aiBusy} className="btn btn-primary mb-3 w-full !py-2 text-xs">
-                  <Sparkles size={13} /> Gerar imagem com IA
-                </button>
+                <div className="mb-3 rounded-lg border border-white/8 bg-white/[0.03] p-2">
+                  <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-lo)]">
+                    <Sparkles size={12} /> Gerar com IA
+                  </div>
+                  <AiImageBox compact titulo="Gerar imagem" busy={aiBusy} onGenerate={(input) => onGenerateImageEl(el.id, input)} />
+                </div>
               )}
               <Field label="Ajuste">
                 <Select

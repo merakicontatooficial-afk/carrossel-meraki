@@ -45,7 +45,8 @@ const FONT_PAIRS: Record<string, { display: string; body: string }> = {
 
 const IMG_MODES = [
   { id: "sem", label: "Sem imagens", on: true },
-  { id: "fundo", label: "Com imagens", on: true },
+  { id: "cartao", label: "Cartão de imagem", on: true },
+  { id: "fundo", label: "Imagem de fundo", on: true },
 ] as const;
 
 // mini mockup por modelo (pro card de Estilo Visual)
@@ -67,7 +68,7 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const [idioma, setIdioma] = useState("pt-BR");
   const [nSlides, setNSlides] = useState(5);
   const [modelo, setModelo] = useState<AiModelo>("minimalista");
-  const [imgMode, setImgMode] = useState<string>("sem");
+  const [imgMode, setImgMode] = useState<string>("cartao");
   const [gerarIA, setGerarIA] = useState(false);
   const [estiloImg, setEstiloImg] = useState("");
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -155,7 +156,7 @@ export default function Wizard({ collections, templates, initialTema, initialSte
       if (fp?.display) kit.fontDisplay = fp.display;
       if (fp?.body) { kit.fontBody = fp.body; kit.fontLabel = fp.body; }
 
-      const slides = aiToSlides(ai, modelo, { imageSlides, brandName });
+      const slides = aiToSlides(ai, modelo, { imageSlides, brandName, imgKind: imgMode === "fundo" ? "fundo" : "cartao" });
 
       // cores alternadas entre slides (estilo MyPostFlow)
       if (alternarCores) applyAlternating(slides, cFundo2, cAccent);
@@ -325,8 +326,9 @@ export default function Wizard({ collections, templates, initialTema, initialSte
                     </button>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[11px] text-[var(--text-lo)]">
-                  No <b className="text-[var(--text-md)]">Profile</b> a imagem vira o retângulo de mídia do tweet. Nos demais modelos, vira foto de fundo do slide.
+                <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--text-lo)]">
+                  <b className="text-[var(--text-md)]">Cartão</b>: retângulo de imagem no slide (todos os modelos, inclusive a capa) — é o padrão.
+                  <br /><b className="text-[var(--text-md)]">Fundo</b>: foto ocupando o slide inteiro, com o texto por cima.
                 </p>
               </div>
               <label className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${gerarIA ? "border-[var(--brand-sat)] bg-[var(--brand-sat)]/12" : "border-white/10"} ${imgMode === "sem" ? "opacity-40" : ""}`}>
