@@ -213,6 +213,17 @@ export default function Editor({
     setIndex(Math.min(i, slides.length - 1));
   };
 
+  /** arrastar e soltar na filmstrip: tira de `from` e insere em `to`. */
+  const reorderSlide = (from: number, to: number) => {
+    if (from === to) return;
+    const slides = [...carousel.slides];
+    const [movido] = slides.splice(from, 1);
+    slides.splice(to, 0, movido);
+    commitHistory();
+    onChange({ ...carousel, slides });
+    setIndex(to);
+  };
+
   const moveSlide = (i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= carousel.slides.length) return;
@@ -703,6 +714,7 @@ export default function Editor({
             onDuplicate={duplicateSlide}
             onDelete={deleteSlide}
             onMove={moveSlide}
+            onReorder={reorderSlide}
           />
         </main>
       </div>
