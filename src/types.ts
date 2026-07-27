@@ -83,6 +83,13 @@ export interface SlideColors {
   accent?: string;
 }
 
+/** Degradê como FUNDO do slide (vale com ou sem foto; a foto fica por cima). */
+export interface SlideGradient {
+  from: string;
+  to: string;
+  angle: number; // graus (180 = de cima pra baixo)
+}
+
 export type SlideKind = "cover" | "value" | "proof" | "cta";
 
 /** Override do logo só deste slide (posição livre). Ausente = herda o padrão do carrossel. */
@@ -98,6 +105,7 @@ export interface Slide {
   kind?: SlideKind;
   elements: Element[];
   bg?: ColorToken; // token = herda marca
+  bgGradient?: SlideGradient; // degradê de fundo (opcional; independe de ter foto)
   bgImage?: string; // dataURL opcional
   bgScale?: number; // zoom da foto de fundo (1 = cover; >1 aproxima)
   bgPosX?: number; // pan horizontal em % (-50..50; 0 = centro)

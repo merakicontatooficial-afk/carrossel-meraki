@@ -144,6 +144,10 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
         position: "relative",
         overflow: "hidden",
         backgroundColor: resolveColor(slide.bg ?? "bg", slide, kit, pal.bg),
+        // degradê de fundo do slide (fica ATRÁS da foto, se houver)
+        backgroundImage: slide.bgGradient
+          ? `linear-gradient(${slide.bgGradient.angle ?? 180}deg, ${slide.bgGradient.from}, ${slide.bgGradient.to})`
+          : undefined,
       }}
       onPointerDown={
         interactive

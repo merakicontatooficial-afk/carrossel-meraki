@@ -6,7 +6,7 @@ import { autoLayout } from "../../lib/aiCarousel";
 import { cloneSlides } from "../../lib/clone";
 import { exportCarousel } from "../../lib/export";
 import { api } from "../../lib/api";
-import { AccordionGroup, Btn, ColorInput, Field, NumberInput, Section } from "../ui";
+import { AccordionGroup, Btn, ColorInput, Field, NumberInput, Section, SliderField } from "../ui";
 import IdentityPanel from "./IdentityPanel";
 import LogoUploader from "./LogoUploader";
 import FramePanel from "./FramePanel";
@@ -16,7 +16,7 @@ import ManualInspector from "./ManualInspector";
 import Preview from "./Preview";
 import Filmstrip from "./Filmstrip";
 import AiImageBox, { type AiImageInput } from "./AiImageBox";
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, StretchHorizontal, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeft, Blend, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, StretchHorizontal, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
 
 /** Botões de alinhar o elemento selecionado no slide (barra superior do Estúdio). */
 const ALIGN_BTNS: { t?: string; i?: React.ReactNode; calc?: (el: Element) => Partial<Element>; sep?: boolean }[] = [
@@ -689,6 +689,77 @@ export default function Editor({
                   <ColorInput value={slide.colors.accent ?? pal.accent} onChange={(accent) => patchSlide(safeIndex, { colors: { ...slide.colors, accent } })} />
                 </Field>
               </div>
+            )}
+          </Section>
+
+          {/* degradê como FUNDO do slide (funciona com ou sem foto) */}
+          <Section title={`Degradê do slide ${safeIndex + 1}`} icon={<Blend size={15} />}>
+            <label className="mb-3 flex cursor-pointer items-center gap-2.5 text-xs text-zinc-300">
+              <input
+                type="checkbox"
+                checked={!!slide.bgGradient}
+                style={{ accentColor: "var(--brand-sat)" }}
+                onChange={(e) =>
+                  patchSlide(safeIndex, {
+                    bgGradient: e.target.checked ? { from: pal.bg, to: pal.accent, angle: 180 } : undefined,
+                  })
+                }
+              />
+              Usar degradê no fundo deste slide
+            </label>
+
+            {slide.bgGradient && (
+              <>
+                <div
+                  className="mb-3 h-14 w-full rounded-lg border border-white/10"
+                  style={{ backgroundImage: `linear-gradient(${slide.bgGradient.angle}deg, ${slide.bgGradient.from}, ${slide.bgGradient.to})` }}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Cor inicial">
+                    <ColorInput value={slide.bgGradient.from} onChange={(from) => patchSlide(safeIndex, { bgGradient: { ...slide.bgGradient!, from } })} />
+                  </Field>
+                  <Field label="Cor final">
+                    <ColorInput value={slide.bgGradient.to} onChange={(to) => patchSlide(safeIndex, { bgGradient: { ...slide.bgGradient!, to } })} />
+                  </Field>
+                </div>
+
+                <div className="mb-1.5 text-xs text-[var(--text-md)]">Direção</div>
+                <div className="mb-3 flex flex-wrap gap-1">
+                  {[
+                    { t: "↓ de cima pra baixo", a: 180 },
+                    { t: "↑ de baixo pra cima", a: 0 },
+                    { t: "→ da esquerda pra direita", a: 90 },
+                    { t: "← da direita pra esquerda", a: 270 },
+                    { t: "↘ diagonal", a: 135 },
+                    { t: "↗ diagonal", a: 45 },
+                  ].map((d) => (
+                    <button
+                      key={d.a}
+                      type="button"
+                      title={d.t}
+                      onClick={() => patchSlide(safeIndex, { bgGradient: { ...slide.bgGradient!, angle: d.a } })}
+                      className={`rounded-md border px-2 py-1 text-xs ${slide.bgGradient!.angle === d.a ? "border-[var(--brand-sat)] bg-[var(--brand-sat)]/15 text-white" : "border-white/10 text-[var(--text-md)] hover:text-white"}`}
+                    >
+                      {d.t.split(" ")[0]}
+                    </button>
+                  ))}
+                </div>
+                <SliderField label="Ângulo (graus)" value={slide.bgGradient.angle} min={0} max={360} onChange={(angle) => patchSlide(safeIndex, { bgGradient: { ...slide.bgGradient!, angle } })} />
+
+                <button
+                  type="button"
+                  className="btn w-full !py-2 text-xs"
+                  onClick={() => {
+                    commitHistory();
+                    onChange({ ...carousel, slides: carousel.slides.map((s) => ({ ...s, bgGradient: { ...slide.bgGradient! } })) });
+                  }}
+                >
+                  <Copy size={13} /> Aplicar este degradê em todos os slides
+                </button>
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                  O degradê fica atrás da foto de fundo — se o slide tiver foto, ela cobre o degradê.
+                </p>
+              </>
             )}
           </Section>
           </AccordionGroup>
