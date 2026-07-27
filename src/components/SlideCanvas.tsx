@@ -66,11 +66,28 @@ function snapTo(value: number, guides: number[], threshold: number): { value: nu
   return { value, guide: null };
 }
 
-/** Pan (translate%) + escala mínima que mantém cobertura total ao mover em qualquer eixo. */
-function coverPanTransform(px: number, py: number, zoom: number): string {
-  const need = 1 + (2 * Math.max(Math.abs(px), Math.abs(py))) / 100; // sem revelar borda
-  const s = Math.max(zoom || 1, need);
-  return `translate(${px}%, ${py}%) scale(${s})`;
+/**
+ * Enquadramento da imagem dentro do quadro. **Mover NUNCA altera o zoom.**
+ *
+ * O deslocamento acontece em duas sobras independentes:
+ *  1. a sobra do `object-fit: cover` — percorrida com `object-position`, que o
+ *     navegador limita sozinho (não tem como revelar fundo vazio);
+ *  2. a sobra criada pelo zoom (`scale`) — percorrida com `translate`, no
+ *     máximo `(z-1)/2` do quadro pra cada lado, que é exatamente o que sobra.
+ *
+ * Sinal igual ao de antes: pan positivo empurra a imagem pra direita/baixo, ou
+ * seja, mostra a parte esquerda/de cima dela.
+ */
+function imageFraming(px: number, py: number, zoom: number): CSSProperties {
+  const clamp = (v: number) => Math.max(-50, Math.min(50, v || 0));
+  const x = clamp(px);
+  const y = clamp(py);
+  const z = Math.max(1, zoom || 1);
+  return {
+    objectPosition: `${50 - x}% ${50 - y}%`,
+    transform: `translate(${x * (z - 1)}%, ${y * (z - 1)}%) scale(${z})`,
+    transformOrigin: "center",
+  };
 }
 
 /**
@@ -167,10 +184,7 @@ export default function SlideCanvas({ slide, kit, carousel, slideIndex, mode, in
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            // pan via translate% + escala automática que garante cobertura em AMBOS
-            // os eixos (⇆ e ⇅ sempre funcionam, sem revelar borda). Zoom soma por cima.
-            transform: coverPanTransform(slide.bgPosX ?? 0, slide.bgPosY ?? 0, slide.bgScale ?? 1),
-            transformOrigin: "center",
+            ...imageFraming(slide.bgPosX ?? 0, slide.bgPosY ?? 0, slide.bgScale ?? 1),
           }}
           draggable={false}
         />
@@ -743,7 +757,6 @@ function ElementContent({
         </div>
       );
     }
-    const panned = (el.imgPosX ?? 0) !== 0 || (el.imgPosY ?? 0) !== 0 || (el.imgScale ?? 1) !== 1;
     return (
       <div
         style={{
@@ -762,8 +775,7 @@ function ElementContent({
             width: "100%",
             height: "100%",
             objectFit: el.fit ?? "cover",
-            transform: panned ? coverPanTransform(el.imgPosX ?? 0, el.imgPosY ?? 0, el.imgScale ?? 1) : undefined,
-            transformOrigin: "center",
+            ...imageFraming(el.imgPosX ?? 0, el.imgPosY ?? 0, el.imgScale ?? 1),
           }}
         />
       </div>
