@@ -19,22 +19,22 @@ export const IMAGE_MODELS: ImageModelInfo[] = [
     key: "lite",
     curto: "Lite",
     nome: "Nano Banana 2 Lite",
-    custo: "R$ 0,17 · ~3 s",
+    custo: "R$ 0,17 · ~3 s · 1K",
     nota: "Padrão. Dá conta de comida, produto e ambiente — e é rápido o bastante pra gerar variações.",
   },
   {
     key: "flash",
     curto: "NB 2",
     nome: "Nano Banana 2",
-    custo: "R$ 0,34 · ~25 s",
+    custo: "R$ 0,34 · ~25 s · 1K",
     nota: "Um degrau em pele e detalhe fino. Use quando o rosto ocupar boa parte do slide.",
   },
   {
     key: "pro",
     curto: "Pro",
     nome: "Nano Banana Pro",
-    custo: "R$ 0,69 · ~30 s",
-    nota: "Máximo acabamento e luz cinematográfica. Para a imagem que carrega o post inteiro.",
+    custo: "R$ 0,69 · ~45 s · 2K",
+    nota: "Máximo acabamento e o dobro de resolução (1856×2304) — o 2K sai pelo mesmo preço do 1K.",
   },
 ];
 

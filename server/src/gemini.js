@@ -33,6 +33,16 @@ export const IMAGE_MODELS = {
 };
 export const IMAGE_MODEL_DEFAULT = "lite";
 
+/**
+ * Resolução pedida por modelo. Regra: subir de tier só quando NÃO custa mais.
+ *  - pro   → 2K (1856×2304): o Google cobra o MESMO por 1K e 2K (US$ 0,134);
+ *            só o 4K é mais caro (US$ 0,24). Então 2K é ganho de graça.
+ *  - flash → 1K: no Nano Banana 2 o 2K custa mais (0,101 vs 0,067).
+ *  - lite  → 1K: a própria API recusa 2K ("not supported for this model").
+ * Verificado ao vivo em 29/07/2026.
+ */
+export const IMAGE_SIZES = { pro: "2K" };
+
 /** Aceita a chave ("lite"|"flash"|"pro"); qualquer outra coisa cai no padrão. */
 export function resolveImageModel(modelo) {
   return IMAGE_MODELS[modelo] || IMAGE_MODELS[IMAGE_MODEL_DEFAULT];
@@ -114,7 +124,13 @@ export const ASPECTOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16"
 export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, contexto, modelo, aspecto, fast = false }) {
   assertKey();
   // `fast` é o formato antigo (booleano) — mantido para não quebrar chamadas velhas
-  const model = resolveImageModel(modelo || (fast ? "lite" : undefined));
+  const chave = IMAGE_MODELS[modelo] ? modelo : fast ? "lite" : IMAGE_MODEL_DEFAULT;
+  const model = resolveImageModel(chave);
+
+  const imageConfig = {
+    ...(ASPECTOS.includes(aspecto) ? { aspectRatio: aspecto } : {}),
+    ...(IMAGE_SIZES[chave] ? { imageSize: IMAGE_SIZES[chave] } : {}),
+  };
 
   // AGENTE DE FOTOGRAFIA: a descrição do usuário vira um briefing de foto real.
   const parts = [{ text: buildImagePrompt(prompt, contexto) }];
@@ -131,7 +147,7 @@ export async function generateImage({ prompt, refImageBase64, refMime = "image/j
   const res = await ai.models.generateContent({
     model,
     contents: [{ role: "user", parts }],
-    ...(ASPECTOS.includes(aspecto) ? { config: { imageConfig: { aspectRatio: aspecto } } } : {}),
+    ...(Object.keys(imageConfig).length ? { config: { imageConfig } } : {}),
   });
 
   // procura a primeira parte de imagem na resposta
