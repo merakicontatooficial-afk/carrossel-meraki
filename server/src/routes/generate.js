@@ -46,15 +46,16 @@ router.post(
   })
 );
 
-/** POST /api/generate/image  { prompt, refImageBase64?, refMime?, hq? } → { dataUrl, model } */
+/** POST /api/generate/image  { prompt, refs?, modelo?, aspecto? } → { dataUrl, model }
+ *  modelo: "lite" (padrão) | "flash" | "pro" · aspecto: "4:5" (fundo), "16:9" (cartão)… */
 router.post(
   "/image",
   wrap(async (req, res) => {
-    const { prompt, refImageBase64, refMime, refs, contexto, fast = false } = req.body || {};
+    const { prompt, refImageBase64, refMime, refs, contexto, modelo, aspecto, fast = false } = req.body || {};
     if (!prompt || !String(prompt).trim()) {
       return res.status(400).json({ error: "Informe o 'prompt' da imagem." });
     }
-    const out = await generateImage({ prompt, refImageBase64, refMime, refs, contexto, fast: !!fast });
+    const out = await generateImage({ prompt, refImageBase64, refMime, refs, contexto, modelo, aspecto, fast: !!fast });
     res.json(out);
   })
 );

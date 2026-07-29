@@ -2,6 +2,7 @@
 // Persistência é COMPARTILHADA (servidor): login por email+senha (usuários do
 // Meraki Publisher), carrosséis/templates/coleções da equipe, mídia em disco.
 import type { BrandIdentity, BrandKit, Carousel, Collection, Slide, Template } from "../types";
+import type { ImageModelKey } from "../config/imageModels";
 import { compressCarouselMedia, compressTemplateMedia } from "./imagePrep";
 
 export interface BrandVoice {
@@ -118,7 +119,8 @@ export const api = {
   generateCarousel(input: { tema: string; nSlides: number; modelo: AiModelo; marca?: BrandVoice; idioma?: string }) {
     return post<AiCarousel>("/api/generate/carousel", input);
   },
-  generateImage(input: { prompt: string; refImageBase64?: string; refMime?: string; refs?: { data: string; mime: string }[]; contexto?: string; fast?: boolean }) {
+  /** modelo: "lite" (padrão) | "flash" | "pro" · aspecto: proporção do destino ("4:5", "16:9"…) */
+  generateImage(input: { prompt: string; refImageBase64?: string; refMime?: string; refs?: { data: string; mime: string }[]; contexto?: string; modelo?: ImageModelKey; aspecto?: string }) {
     return post<{ dataUrl: string; model: string }>("/api/generate/image", input);
   },
   refineSlide(input: { texto: string; instrucao: string; marca?: BrandVoice }) {

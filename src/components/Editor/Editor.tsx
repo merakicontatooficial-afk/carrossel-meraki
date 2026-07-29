@@ -16,6 +16,7 @@ import ManualInspector from "./ManualInspector";
 import Preview from "./Preview";
 import Filmstrip from "./Filmstrip";
 import AiImageBox, { type AiImageInput } from "./AiImageBox";
+import { aspectFromSize, ASPECTO_FUNDO } from "../../lib/aspect";
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ArrowLeft, Blend, Bookmark, ChevronLeft, ChevronRight, Copy, Download, FileText, Grid3x3, Loader2, Lock, Move, Pencil, Plus, Redo2, RotateCcw, Sparkles, StretchHorizontal, Trash2, Undo2, Unlock, Wand2, X } from "lucide-react";
 
 /** Botões de alinhar o elemento selecionado no slide (barra superior do Estúdio). */
@@ -285,12 +286,12 @@ export default function Editor({
   // contexto do conteúdo: ajuda o agente de fotografia a criar uma cena coerente
   const contextoImg = () => [marca?.nome, slideText(slide).headline || carousel.name].filter(Boolean).join(" · ");
 
-  // gera a FOTO DE FUNDO do slide (prompt + até 3 referências)
-  const genImage = async ({ prompt, refs }: AiImageInput) => {
+  // gera a FOTO DE FUNDO do slide — proporção do slide inteiro (4:5)
+  const genImage = async ({ prompt, refs, modelo }: AiImageInput) => {
     setAiBusy("Gerando imagem…");
     try {
       const p = prompt || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt: p, refs, contexto: contextoImg() });
+      const img = await api.generateImage({ prompt: p, refs, contexto: contextoImg(), modelo, aspecto: ASPECTO_FUNDO });
       commitHistory();
       patchSlide(safeIndex, { bgImage: img.dataUrl, bgScale: 1, scrim: slide.scrim ?? 96, scrimPos: slide.scrimPos ?? 62 });
     } catch (e) {
@@ -301,11 +302,19 @@ export default function Editor({
   };
 
   // gera imagem por IA DENTRO de um elemento de imagem (cartão/retângulo)
+  // — pede a proporção do próprio quadro, pra foto não chegar cortada
   const genImageElement = async (elId: string, input?: AiImageInput) => {
     setAiBusy("Gerando imagem…");
     try {
       const p = input?.prompt || slideText(slide).headline || carousel.name;
-      const img = await api.generateImage({ prompt: p, refs: input?.refs, contexto: contextoImg() });
+      const alvo = slide.elements.find((e) => e.id === elId);
+      const img = await api.generateImage({
+        prompt: p,
+        refs: input?.refs,
+        contexto: contextoImg(),
+        modelo: input?.modelo,
+        aspecto: alvo ? aspectFromSize(alvo.w, alvo.h) : undefined,
+      });
       commitHistory();
       patchElement(elId, { src: img.dataUrl });
     } catch (e) {

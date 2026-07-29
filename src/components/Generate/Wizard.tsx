@@ -5,6 +5,9 @@ import { aiToSlides, modeloKit, modeloCounter, applyAlternating } from "../../li
 import { KITS, kitToIdentity } from "../../config/kits";
 import { FONT_PAIRS, FONT_PAIR_AUTO } from "../../config/fontPairs";
 import { parseMdCarousel, mdImageSlides, type MdDoc } from "../../lib/mdCarousel";
+import { aspectFromSize, ASPECTO_FUNDO } from "../../lib/aspect";
+import { getImageModel, setImageModel, type ImageModelKey } from "../../config/imageModels";
+import { ImageModelPicker } from "../Editor/AiImageBox";
 import { Field, Select, ColorInput, FileButton } from "../ui";
 import { LayoutGrid, PenLine, Layers, ImageIcon, Type, Wand2, X, ArrowLeft, ArrowRight, Loader2, Check, Newspaper, Palette, FileCode, Upload, AlertTriangle, Copy } from "lucide-react";
 
@@ -64,6 +67,7 @@ export default function Wizard({ collections, templates, initialTema, initialSte
   const [modelo, setModelo] = useState<AiModelo>("minimalista");
   const [imgMode, setImgMode] = useState<string>("cartao");
   const [gerarIA, setGerarIA] = useState(false);
+  const [modeloImg, setModeloImg] = useState<ImageModelKey>(getImageModel);
   const [estiloImg, setEstiloImg] = useState("");
   const [refImage, setRefImage] = useState<string | null>(null);
   const [slidesComImagem, setSlidesComImagem] = useState<number[]>([1]);
@@ -259,16 +263,23 @@ export default function Wizard({ collections, templates, initialTema, initialSte
             // descrição vinda do .md manda; o "estilo das imagens" entra como complemento
             const descMd = fonte === "md" ? (mdDoc?.slides[idx - 1]?.imagem ?? "").trim() : "";
             const prompt = [descMd || `Cena fotográfica que ilustra: ${ctx}`, estiloImg.trim()].filter(Boolean).join(" · ");
+
+            // acha o destino ANTES de gerar, pra pedir a proporção certa:
+            // cartão = o maior slot de imagem vazio (evita cair no avatar do Profile);
+            // sem slot, a foto vira fundo do slide inteiro.
+            const target = slides[idx - 1];
+            const imgEl = target.elements
+              .filter((e) => e.type === "image" && !e.src)
+              .sort((a, b) => b.w * b.h - a.w * a.h)[0];
+
             const img = await api.generateImage({
               prompt,
               refImageBase64: refB64,
               contexto: [clienteNome, fonte === "md" ? mdDoc?.titulo : tema, ctx].filter(Boolean).join(" · "),
+              modelo: modeloImg,
+              aspecto: imgEl ? aspectFromSize(imgEl.w, imgEl.h) : ASPECTO_FUNDO,
             });
-            const target = slides[idx - 1];
-            // maior slot de imagem vazio (evita cair no avatar do Profile)
-            const imgEl = target.elements
-              .filter((e) => e.type === "image" && !e.src)
-              .sort((a, b) => b.w * b.h - a.w * a.h)[0];
+
             if (imgEl) {
               imgEl.src = img.dataUrl;
             } else {
@@ -528,6 +539,14 @@ export default function Wizard({ collections, templates, initialTema, initialSte
                 <input type="checkbox" disabled={imgMode === "sem"} checked={gerarIA} onChange={(e) => setGerarIA(e.target.checked)} style={{ accentColor: "var(--brand-sat)" }} />
                 <span><span className="text-sm text-white">Gerar imagens com IA</span><br /><span className="text-[11px] text-[var(--text-lo)]">Cria imagens automáticas via Google Gemini (usa saldo)</span></span>
               </label>
+              {gerarIA && imgMode !== "sem" && (
+                <div className="rounded-lg border border-white/10 p-3">
+                  <ImageModelPicker value={modeloImg} onChange={(k) => { setModeloImg(k); setImageModel(k); }} />
+                  <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-lo)]">
+                    Vale para as {slidesComImagem.length || 0} imagens desta geração — no editor você pode regerar qualquer uma com outro modelo.
+                  </p>
+                </div>
+              )}
               <Field label="Estilo das imagens (opcional)">
                 <textarea value={estiloImg} onChange={(e) => setEstiloImg(e.target.value)} rows={2} placeholder="Ex.: Fotografia editorial, tons neutros, sem pessoas…" className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]" />
               </Field>

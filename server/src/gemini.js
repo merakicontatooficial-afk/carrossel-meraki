@@ -18,11 +18,25 @@ const ai = new GoogleGenAI({ apiKey: KEY });
 
 export const MODELS = {
   text: process.env.GEMINI_MODEL_TEXT || "gemini-flash-latest",
-  // PADRÃO = Nano Banana **Pro**: qualidade fotográfica muito superior (custa mais
-  // por imagem, decisão do Luiz em 27/07). O Flash fica como modo econômico.
-  image: process.env.GEMINI_MODEL_IMAGE || "gemini-3-pro-image",
-  imageFast: process.env.GEMINI_MODEL_IMAGE_FAST || "gemini-2.5-flash-image",
 };
+
+/**
+ * Modelos de imagem oferecidos na plataforma — o usuário escolhe na hora de gerar.
+ * Teste visual de 29/07/2026 (mesmo prompt nos três): todos devolvem 928×1152 com
+ * arquivo equivalente; o Lite só perde em microtextura de pele em rosto grande.
+ * Por isso o PADRÃO é o Lite (1/4 do preço do Pro e ~8× mais rápido).
+ */
+export const IMAGE_MODELS = {
+  lite: process.env.GEMINI_MODEL_IMAGE_LITE || "gemini-3.1-flash-lite-image",
+  flash: process.env.GEMINI_MODEL_IMAGE_FLASH || "gemini-3.1-flash-image",
+  pro: process.env.GEMINI_MODEL_IMAGE_PRO || "gemini-3-pro-image",
+};
+export const IMAGE_MODEL_DEFAULT = "lite";
+
+/** Aceita a chave ("lite"|"flash"|"pro"); qualquer outra coisa cai no padrão. */
+export function resolveImageModel(modelo) {
+  return IMAGE_MODELS[modelo] || IMAGE_MODELS[IMAGE_MODEL_DEFAULT];
+}
 
 /** Garante que a chave existe antes de gastar uma chamada. */
 function assertKey() {
@@ -87,14 +101,20 @@ export async function generateText({ prompt, system, temperature = 0.8 }) {
   return (res.text ?? "").trim();
 }
 
+/** Proporções aceitas pelos modelos de imagem do Gemini. */
+export const ASPECTOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
+
 /**
  * Gera imagem. `refImageBase64` (opcional, sem prefixo data:) faz a IA usar aquele
- * rosto/produto de referência. `hq: true` usa Nano Banana Pro (4K, pago).
+ * rosto/produto de referência. `modelo` = "lite" | "flash" | "pro" (padrão: lite).
+ * `aspecto` = proporção do destino (ex.: "4:5" no fundo, "16:9" no cartão) — sem ela
+ * o modelo devolve o formato que quiser e a imagem chega torta no slide.
  * Retorna { dataUrl } pronto pra virar bgImage do slide.
  */
-export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, contexto, fast = false }) {
+export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, contexto, modelo, aspecto, fast = false }) {
   assertKey();
-  const model = fast ? MODELS.imageFast : MODELS.image;
+  // `fast` é o formato antigo (booleano) — mantido para não quebrar chamadas velhas
+  const model = resolveImageModel(modelo || (fast ? "lite" : undefined));
 
   // AGENTE DE FOTOGRAFIA: a descrição do usuário vira um briefing de foto real.
   const parts = [{ text: buildImagePrompt(prompt, contexto) }];
@@ -111,6 +131,7 @@ export async function generateImage({ prompt, refImageBase64, refMime = "image/j
   const res = await ai.models.generateContent({
     model,
     contents: [{ role: "user", parts }],
+    ...(ASPECTOS.includes(aspecto) ? { config: { imageConfig: { aspectRatio: aspecto } } } : {}),
   });
 
   // procura a primeira parte de imagem na resposta

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FileButton } from "../ui";
+import { IMAGE_MODELS, getImageModel, setImageModel, type ImageModelKey } from "../../config/imageModels";
 import { ImageIcon, Loader2, Plus, Sparkles, X } from "lucide-react";
 
 export const MAX_REFS = 3;
@@ -7,6 +8,38 @@ export const MAX_REFS = 3;
 export interface AiImageInput {
   prompt: string;
   refs: { data: string; mime: string }[];
+  modelo: ImageModelKey;
+}
+
+/** Escolha do modelo de imagem — a opção fica salva pro próximo uso. */
+export function ImageModelPicker({ value, onChange }: { value: ImageModelKey; onChange: (k: ImageModelKey) => void }) {
+  const atual = IMAGE_MODELS.find((m) => m.key === value) ?? IMAGE_MODELS[0];
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--text-md)]">
+        <span>Modelo</span>
+        <span className="text-[11px] tabular-nums text-[var(--text-lo)]">{atual.custo}</span>
+      </div>
+      <div className="flex gap-1">
+        {IMAGE_MODELS.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            title={`${m.nome} — ${m.nota}`}
+            onClick={() => onChange(m.key)}
+            className={`flex-1 rounded-lg border px-2 py-1.5 text-[11.5px] font-semibold transition ${
+              m.key === value
+                ? "border-[var(--brand-sat)] bg-[var(--brand-sat)]/18 text-white"
+                : "border-white/10 text-[var(--text-md)] hover:text-white"
+            }`}
+          >
+            {m.curto}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1 text-[11px] leading-snug text-[var(--text-lo)]">{atual.nota}</p>
+    </div>
+  );
 }
 
 /** dataURL → { data (base64 puro), mime } para mandar ao backend. */
@@ -34,6 +67,9 @@ export default function AiImageBox({
 }) {
   const [prompt, setPrompt] = useState("");
   const [refs, setRefs] = useState<string[]>([]); // dataURLs
+  const [modelo, setModelo] = useState<ImageModelKey>(getImageModel);
+
+  const trocarModelo = (k: ImageModelKey) => { setModelo(k); setImageModel(k); };
 
   const addRef = (dataUrl: string) => setRefs((r) => (r.length >= MAX_REFS ? r : [...r, dataUrl]));
   const delRef = (i: number) => setRefs((r) => r.filter((_, j) => j !== i));
@@ -80,11 +116,15 @@ export default function AiImageBox({
         )}
       </div>
 
+      <div className="mt-3">
+        <ImageModelPicker value={modelo} onChange={trocarModelo} />
+      </div>
+
       <button
         type="button"
         className="btn btn-primary mt-3 w-full !py-2 text-xs"
         disabled={busy}
-        onClick={() => onGenerate({ prompt: prompt.trim(), refs: refs.map(splitDataUrl) })}
+        onClick={() => onGenerate({ prompt: prompt.trim(), refs: refs.map(splitDataUrl), modelo })}
       >
         {busy ? <Loader2 size={13} className="animate-spin" /> : refs.length ? <Sparkles size={13} /> : <ImageIcon size={13} />}
         {titulo}
