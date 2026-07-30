@@ -3,6 +3,7 @@ import { Router } from "express";
 import { generateJson, generateText, generateImage, fetchTrends, fetchDailyTrends, researchTopic } from "../gemini.js";
 import { buildSystem, carouselSchema, carouselPrompt, CAPTION_EXPERTISE } from "../prompts.js";
 import { db } from "../db.js";
+import { registrarUso } from "../settings.js";
 
 const router = Router();
 
@@ -56,7 +57,13 @@ router.post(
       return res.status(400).json({ error: "Informe o 'prompt' da imagem." });
     }
     const out = await generateImage({ prompt, refImageBase64, refMime, refs, contexto, modelo, aspecto, fast: !!fast });
-    res.json(out);
+    // registra o gasto (alimenta o painel de consumo em Configurações)
+    try {
+      registrarUso({ tipo: "imagem", modelo: out.model, nivel: out.nivel, custoUsd: out.custoUsd, usuario: req.usuario });
+    } catch (e) {
+      console.error("[uso] não registrou:", e.message); // nunca derruba a geração
+    }
+    res.json({ dataUrl: out.dataUrl, model: out.model, nivel: out.nivel });
   })
 );
 

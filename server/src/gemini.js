@@ -5,20 +5,31 @@
 // ─────────────────────────────────────────────────────────────
 import { GoogleGenAI } from "@google/genai";
 import { buildImagePrompt } from "./prompts.js";
+import * as settings from "./settings.js";
 
-const KEY = process.env.GEMINI_API_KEY;
-if (!KEY) {
+// A chave e os modelos vêm de settings.js (painel → .env → padrão), resolvidos a
+// CADA chamada — trocar a chave nas Configurações vale na hora, sem reiniciar.
+let _client = null;
+let _clientKey = null;
+function client() {
+  const key = settings.get("gemini_api_key");
+  if (!key) throw new Error("Chave da API não configurada. Ajuste em Configurações → API de IA.");
+  if (!_client || _clientKey !== key) {
+    _client = new GoogleGenAI({ apiKey: key });
+    _clientKey = key;
+  }
+  return _client;
+}
+
+if (!settings.get("gemini_api_key")) {
   console.warn(
-    "[gemini] GEMINI_API_KEY vazia — crie a chave da CONTA DA MERAKI em " +
-      "https://aistudio.google.com/apikey e cole no .env. As rotas de IA vão falhar até lá."
+    "[gemini] sem chave — configure em Configurações → API de IA (ou GEMINI_API_KEY no .env). " +
+      "As rotas de IA vão falhar até lá."
   );
 }
 
-const ai = new GoogleGenAI({ apiKey: KEY });
-
-export const MODELS = {
-  text: process.env.GEMINI_MODEL_TEXT || "gemini-flash-latest",
-};
+/** Modelo de texto vigente (carrossel, refino, legenda, trends). */
+const modelText = () => settings.get("modelo_texto");
 
 /**
  * Modelos de imagem oferecidos na plataforma — o usuário escolhe na hora de gerar.
@@ -26,12 +37,13 @@ export const MODELS = {
  * arquivo equivalente; o Lite só perde em microtextura de pele em rosto grande.
  * Por isso o PADRÃO é o Lite (1/4 do preço do Pro e ~8× mais rápido).
  */
-export const IMAGE_MODELS = {
-  lite: process.env.GEMINI_MODEL_IMAGE_LITE || "gemini-3.1-flash-lite-image",
-  flash: process.env.GEMINI_MODEL_IMAGE_FLASH || "gemini-3.1-flash-image",
-  pro: process.env.GEMINI_MODEL_IMAGE_PRO || "gemini-3-pro-image",
-};
+export const imageModels = () => ({
+  lite: settings.get("modelo_img_lite"),
+  flash: settings.get("modelo_img_flash"),
+  pro: settings.get("modelo_img_pro"),
+});
 export const IMAGE_MODEL_DEFAULT = "lite";
+export const NIVEIS = ["lite", "flash", "pro"];
 
 /**
  * Resolução pedida por modelo. Regra: subir de tier só quando NÃO custa mais.
@@ -43,14 +55,10 @@ export const IMAGE_MODEL_DEFAULT = "lite";
  */
 export const IMAGE_SIZES = { pro: "2K" };
 
-/** Aceita a chave ("lite"|"flash"|"pro"); qualquer outra coisa cai no padrão. */
-export function resolveImageModel(modelo) {
-  return IMAGE_MODELS[modelo] || IMAGE_MODELS[IMAGE_MODEL_DEFAULT];
-}
-
-/** Garante que a chave existe antes de gastar uma chamada. */
-function assertKey() {
-  if (!KEY) throw new Error("GEMINI_API_KEY ausente no servidor (.env).");
+/** Aceita o nível ("lite"|"flash"|"pro"); qualquer outra coisa cai no padrão. */
+export function resolveImageModel(nivel) {
+  const m = imageModels();
+  return m[nivel] || m[IMAGE_MODEL_DEFAULT];
 }
 
 /**
@@ -58,9 +66,8 @@ function assertKey() {
  * Usado por carrossel/refino/legenda.
  */
 export async function generateJson({ prompt, schema, system }) {
-  assertKey();
-  const res = await ai.models.generateContent({
-    model: MODELS.text,
+  const res = await client().models.generateContent({
+    model: modelText(),
     contents: prompt,
     config: {
       ...(system ? { systemInstruction: system } : {}),
@@ -85,10 +92,9 @@ export async function generateJson({ prompt, schema, system }) {
  * curto — usado para "alimentar" a geração do carrossel com dados reais, não achismo.
  */
 export async function researchTopic(tema) {
-  assertKey();
   try {
-    const res = await ai.models.generateContent({
-      model: MODELS.text,
+    const res = await client().models.generateContent({
+      model: modelText(),
       contents:
         `Pesquise fatos atuais, dados, números e exemplos concretos sobre: "${tema}". ` +
         `Devolva um briefing em 5-8 bullets curtos, só fatos verificáveis e específicos (nada genérico). Em português.`,
@@ -102,9 +108,8 @@ export async function researchTopic(tema) {
 
 /** Texto livre (ex.: refino curto de um slide). */
 export async function generateText({ prompt, system, temperature = 0.8 }) {
-  assertKey();
-  const res = await ai.models.generateContent({
-    model: MODELS.text,
+  const res = await client().models.generateContent({
+    model: modelText(),
     contents: prompt,
     config: { ...(system ? { systemInstruction: system } : {}), temperature },
   });
@@ -122,14 +127,13 @@ export const ASPECTOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16"
  * Retorna { dataUrl } pronto pra virar bgImage do slide.
  */
 export async function generateImage({ prompt, refImageBase64, refMime = "image/jpeg", refs, contexto, modelo, aspecto, fast = false }) {
-  assertKey();
   // `fast` é o formato antigo (booleano) — mantido para não quebrar chamadas velhas
-  const chave = IMAGE_MODELS[modelo] ? modelo : fast ? "lite" : IMAGE_MODEL_DEFAULT;
-  const model = resolveImageModel(chave);
+  const nivel = NIVEIS.includes(modelo) ? modelo : fast ? "lite" : IMAGE_MODEL_DEFAULT;
+  const model = resolveImageModel(nivel);
 
   const imageConfig = {
     ...(ASPECTOS.includes(aspecto) ? { aspectRatio: aspecto } : {}),
-    ...(IMAGE_SIZES[chave] ? { imageSize: IMAGE_SIZES[chave] } : {}),
+    ...(IMAGE_SIZES[nivel] ? { imageSize: IMAGE_SIZES[nivel] } : {}),
   };
 
   // AGENTE DE FOTOGRAFIA: a descrição do usuário vira um briefing de foto real.
@@ -144,7 +148,7 @@ export async function generateImage({ prompt, refImageBase64, refMime = "image/j
     if (r?.data) parts.push({ inlineData: { mimeType: r.mime || "image/jpeg", data: r.data } });
   }
 
-  const res = await ai.models.generateContent({
+  const res = await client().models.generateContent({
     model,
     contents: [{ role: "user", parts }],
     ...(Object.keys(imageConfig).length ? { config: { imageConfig } } : {}),
@@ -157,7 +161,19 @@ export async function generateImage({ prompt, refImageBase64, refMime = "image/j
     throw new Error("Gemini não devolveu imagem (verifique o modelo/limite).");
   }
   const mime = imgPart.inlineData.mimeType || "image/png";
-  return { dataUrl: `data:${mime};base64,${imgPart.inlineData.data}`, model };
+  // `nivel` e `custoUsd` sobem junto p/ a rota registrar o consumo (painel de custos)
+  return { dataUrl: `data:${mime};base64,${imgPart.inlineData.data}`, model, nivel, custoUsd: settings.CUSTO_IMAGEM_USD[nivel] ?? 0 };
+}
+
+/** Ping barato na API: confirma que a chave responde. Usado pelo botão "Testar". */
+export async function testarChave() {
+  const t0 = Date.now();
+  const res = await client().models.generateContent({
+    model: modelText(),
+    contents: "Responda apenas com a palavra: ok",
+    config: { temperature: 0 },
+  });
+  return { ok: true, ms: Date.now() - t0, modelo: modelText(), resposta: (res.text ?? "").trim().slice(0, 40) };
 }
 
 /**
@@ -165,10 +181,9 @@ export async function generateImage({ prompt, refImageBase64, refMime = "image/j
  * já resumidas. `period`: hoje | semana | mes | qualquer.
  */
 export async function fetchTrends({ query, period = "semana", limit = 8 }) {
-  assertKey();
   const periodo = { hoje: "nas últimas 24h", semana: "nos últimos 7 dias", mes: "nos últimos 30 dias", qualquer: "recentemente" }[period] || "recentemente";
-  const res = await ai.models.generateContent({
-    model: MODELS.text,
+  const res = await client().models.generateContent({
+    model: modelText(),
     contents:
       `Liste ${limit} notícias/assuntos em ALTA ${periodo} sobre "${query}". ` +
       `Para cada um devolva um objeto com: titulo, fonte, quando (ex.: "há 3 horas"), resumo (1 frase). ` +
@@ -193,10 +208,9 @@ export async function fetchTrends({ query, period = "semana", limit = 8 }) {
  * Cacheado por dia no banco (ver rota /trends/daily).
  */
 export async function fetchDailyTrends({ limit = 10 } = {}) {
-  assertKey();
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  const res = await ai.models.generateContent({
-    model: MODELS.text,
+  const res = await client().models.generateContent({
+    model: modelText(),
     contents:
       `Hoje é ${hoje}. Liste os ${limit} ASSUNTOS/NOTÍCIAS MAIS EM ALTA no BRASIL agora — ` +
       `o que está realmente viralizando e repercutindo (trending). Misture entretenimento, ` +

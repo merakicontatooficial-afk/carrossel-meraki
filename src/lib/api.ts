@@ -135,6 +135,12 @@ export const api = {
   },
   dailyTrends: () => get<{ date: string; items: TrendItem[] }>("/api/generate/trends/daily"),
 
+  // ── configurações da IA (só conta dona) ──
+  getConfigIA: () => get<ConfigIA>("/api/config/ia"),
+  salvarConfigIA: (b: { chave?: string; modelos?: Record<string, string> }) => req<ConfigIA>("/api/config/ia", "PUT", b),
+  testarConfigIA: () => post<TesteIA>("/api/config/ia/testar", {}),
+  usoIA: () => get<UsoIA>("/api/config/uso"),
+
   // ── acessos / equipe (só conta dona) ──
   listEquipe: () => get<AcessoUser[]>("/api/equipe"),
   criarAcesso: (b: { nome: string; email: string; senha: string; papel: string }) => post<AcessoUser>("/api/equipe", b),
@@ -142,6 +148,26 @@ export const api = {
   resetarSenha: (id: number, senha: string) => post<{ ok: boolean }>(`/api/equipe/${id}/senha`, { senha }),
   removerAcesso: (id: number) => req<{ ok: boolean }>(`/api/equipe/${id}`, "DELETE"),
 };
+
+/** De onde veio cada valor: painel (banco) → servidor (.env) → padrao (código). */
+export type OrigemConfig = "painel" | "servidor" | "padrao";
+
+export interface ConfigIA {
+  provedor: string;
+  chave: { configurada: boolean; mascara: string; origem: OrigemConfig; atualizadaEm: number | null; atualizadaPor: string | null };
+  modelos: Record<string, { valor: string; origem: OrigemConfig; padrao: string }>;
+  resolucoes: Record<string, string>;
+  custoImagemUsd: Record<string, number>;
+}
+export interface TesteIA { ok: boolean; ms?: number; modelo?: string; resposta?: string; erro?: string }
+export interface UsoIA {
+  mes: { imagens: number; usd: number };
+  trintaDias: { imagens: number; usd: number };
+  porNivel: { nivel: string; imagens: number; usd: number }[];
+  ultima: { em: number; modelo: string; por: string | null } | null;
+  modelosAtuais: Record<string, string>;
+  custoImagemUsd: Record<string, number>;
+}
 
 export interface TrendItem { titulo: string; categoria?: string; fonte: string; quando: string; resumo: string }
 export interface AcessoUser { id: number; nome: string; email: string; papel: string; ativo: number; dono: number; criadoEm?: number | string | null }

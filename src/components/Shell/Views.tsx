@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { BrandIdentity, Collection, Template } from "../../types";
-import { api, type TrendItem, type AcessoUser } from "../../lib/api";
+import { api, type TrendItem, type AcessoUser, type ConfigIA, type UsoIA, type TesteIA, type OrigemConfig } from "../../lib/api";
 import { ColorInput, FileButton, Select } from "../ui";
 import { DEFAULT_IDENTITY } from "../../config/kits";
 import { FONT_PAIRS, FONT_PAIR_AUTO } from "../../config/fontPairs";
@@ -146,6 +146,244 @@ export function TrendingsView({ onCreateFromTrend }: { onCreateFromTrend: (tema:
   );
 }
 
+/** Dólar usado só para dar a noção em reais no painel de consumo. */
+const USD_BRL = 5.12;
+const brl = (usd: number) => (usd * USD_BRL).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const ORIGEM_LABEL: Record<OrigemConfig, string> = {
+  painel: "definido aqui",
+  servidor: "vindo do servidor",
+  padrao: "padrão do sistema",
+};
+
+const CAMPOS_MODELO: { chave: string; label: string; ajuda: string }[] = [
+  { chave: "modelo_texto", label: "Texto (copy, legenda, trends)", ajuda: "Escreve os carrosséis e as legendas." },
+  { chave: "modelo_img_lite", label: "Imagem · Lite", ajuda: "O padrão de geração — o mais barato." },
+  { chave: "modelo_img_flash", label: "Imagem · Nano Banana 2", ajuda: "Degrau intermediário." },
+  { chave: "modelo_img_pro", label: "Imagem · Pro", ajuda: "Máximo acabamento; sai em 2K." },
+];
+
+/**
+ * Configuração da API de IA — só a conta dona enxerga.
+ * Deixa trocar a chave e os modelos sem mexer no servidor, testar a conexão
+ * e acompanhar quanto já foi gasto em imagens no mês.
+ */
+function ConfigIAPanel() {
+  const [cfg, setCfg] = useState<ConfigIA | null>(null);
+  const [uso, setUso] = useState<UsoIA | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [novaChave, setNovaChave] = useState("");
+  const [modelos, setModelos] = useState<Record<string, string>>({});
+  const [salvando, setSalvando] = useState(false);
+  const [testando, setTestando] = useState(false);
+  const [teste, setTeste] = useState<TesteIA | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+
+  const carregar = async () => {
+    setErro(null);
+    try {
+      const [c, u] = await Promise.all([api.getConfigIA(), api.usoIA()]);
+      setCfg(c);
+      setUso(u);
+      setModelos(Object.fromEntries(Object.entries(c.modelos).map(([k, v]) => [k, v.valor])));
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+  };
+  useEffect(() => { carregar(); }, []);
+
+  const salvar = async () => {
+    setSalvando(true);
+    setErro(null);
+    setOk(null);
+    try {
+      const c = await api.salvarConfigIA({ ...(novaChave.trim() ? { chave: novaChave.trim() } : {}), modelos });
+      setCfg(c);
+      setModelos(Object.fromEntries(Object.entries(c.modelos).map(([k, v]) => [k, v.valor])));
+      setNovaChave("");
+      setOk("Configuração salva — já vale para a próxima geração.");
+      setTeste(null);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const testar = async () => {
+    setTestando(true);
+    setTeste(null);
+    try {
+      setTeste(await api.testarConfigIA());
+    } catch (e) {
+      setTeste({ ok: false, erro: (e as Error).message });
+    } finally {
+      setTestando(false);
+    }
+  };
+
+  const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]";
+
+  if (!cfg) {
+    return (
+      <div className="glass mb-5 flex items-center gap-2 p-6 text-sm text-[var(--text-md)]">
+        {erro ? <span className="text-red-300">{erro}</span> : <><Loader2 size={16} className="animate-spin" /> Carregando configuração…</>}
+      </div>
+    );
+  }
+
+  const mudou = novaChave.trim() !== "" || CAMPOS_MODELO.some((c) => (modelos[c.chave] ?? "") !== (cfg.modelos[c.chave]?.valor ?? ""));
+
+  return (
+    <div className="glass mb-6 p-5">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-sat)]/25 text-[var(--brand-hi)]"><KeyRound size={17} /></div>
+        <div className="mr-auto">
+          <h2 className="text-sm font-semibold text-white">API de IA · {cfg.provedor}</h2>
+          <p className="text-[12px] text-[var(--text-md)]">Chave e modelos usados para gerar texto e imagem. Visível só para a conta principal.</p>
+        </div>
+        <button className="btn !min-h-0 !py-2" onClick={testar} disabled={testando}>
+          {testando ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Testar conexão
+        </button>
+      </div>
+
+      {teste && (
+        <p className={`mb-4 rounded-lg px-3 py-2 text-[12px] ${teste.ok ? "bg-emerald-500/10 text-emerald-200" : "bg-red-500/10 text-red-300"}`}>
+          {teste.ok
+            ? `Conexão OK — ${teste.modelo} respondeu em ${teste.ms} ms.`
+            : `Falhou: ${teste.erro}`}
+        </p>
+      )}
+
+      {/* chave */}
+      <div className="mb-5">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs text-[var(--text-md)]">
+          <span>Chave da API</span>
+          {cfg.chave.configurada ? (
+            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">
+              {cfg.chave.mascara} · {ORIGEM_LABEL[cfg.chave.origem]}
+            </span>
+          ) : (
+            <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] text-red-300">nenhuma chave configurada</span>
+          )}
+        </div>
+        <input
+          className={inp}
+          type="password"
+          autoComplete="off"
+          value={novaChave}
+          onChange={(e) => setNovaChave(e.target.value)}
+          placeholder={cfg.chave.configurada ? "Cole uma chave nova para substituir a atual" : "Cole a chave da conta Google da Meraki"}
+        />
+        <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-lo)]">
+          A chave nunca é exibida por inteiro depois de salva. Gere uma em{" "}
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-[var(--brand-hi)] hover:underline">aistudio.google.com/apikey</a>{" "}
+          usando a conta da Meraki.
+          {cfg.chave.origem === "painel" && " Deixar em branco e salvar não apaga a atual — para voltar à chave do servidor, use o botão abaixo."}
+        </p>
+        {cfg.chave.origem === "painel" && (
+          <button
+            className="btn !min-h-0 mt-2 !py-1.5 text-[11px]"
+            onClick={async () => {
+              if (!confirm("Voltar a usar a chave configurada no servidor (.env)?")) return;
+              setCfg(await api.salvarConfigIA({ chave: "" }));
+            }}
+          >
+            Voltar à chave do servidor
+          </button>
+        )}
+      </div>
+
+      {/* modelos */}
+      <div className="mb-4">
+        <div className="mb-2 text-xs text-[var(--text-md)]">Modelos</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {CAMPOS_MODELO.map((c) => {
+            const meta = cfg.modelos[c.chave];
+            return (
+              <label key={c.chave} className="block">
+                <span className="mb-1 flex items-center justify-between text-[11px] text-[var(--text-md)]">
+                  <span>{c.label}</span>
+                  <span className="text-[var(--text-lo)]">{meta ? ORIGEM_LABEL[meta.origem] : ""}</span>
+                </span>
+                <input
+                  className={`${inp} font-mono !text-[12px]`}
+                  spellCheck={false}
+                  value={modelos[c.chave] ?? ""}
+                  onChange={(e) => setModelos({ ...modelos, [c.chave]: e.target.value })}
+                  placeholder={meta?.padrao}
+                />
+                <span className="mt-0.5 block text-[10.5px] text-[var(--text-lo)]">
+                  {c.ajuda}
+                  {c.chave.startsWith("modelo_img_") && cfg.resolucoes[c.chave.replace("modelo_img_", "")] ? ` · sai em ${cfg.resolucoes[c.chave.replace("modelo_img_", "")]}` : ""}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-lo)]">
+          Campo vazio volta ao padrão do sistema. Trocar de <b className="text-[var(--text-md)]">provedor</b> (sair do Google) ainda exige alteração no código — aqui dá pra trocar chave e modelos.
+        </p>
+      </div>
+
+      {(erro || ok) && (
+        <p className={`mb-3 rounded-lg px-3 py-2 text-[12px] ${erro ? "bg-red-500/10 text-red-300" : "bg-emerald-500/10 text-emerald-200"}`}>{erro || ok}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <button className="btn btn-primary !min-h-0 !py-2" onClick={salvar} disabled={salvando || !mudou}>
+          {salvando ? <Loader2 size={14} className="animate-spin" /> : null} Salvar configuração
+        </button>
+        {mudou && <span className="text-[11px] text-[var(--text-lo)]">alterações não salvas</span>}
+      </div>
+
+      {/* consumo */}
+      <div className="mt-6 border-t border-white/8 pt-4">
+        <div className="mb-3 flex items-center gap-2">
+          <h3 className="mr-auto text-[13px] font-semibold text-white">Consumo de imagens</h3>
+          <button className="btn !min-h-0 !px-2.5 !py-1.5" onClick={carregar} title="Atualizar"><RefreshCw size={13} /></button>
+        </div>
+        {uso && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-white/10 p-3">
+                <div className="text-[11px] text-[var(--text-lo)]">Este mês</div>
+                <div className="text-xl font-semibold tabular-nums text-white">{brl(uso.mes.usd)}</div>
+                <div className="text-[11px] text-[var(--text-md)]">{uso.mes.imagens} imagens · US$ {uso.mes.usd.toFixed(2)}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 p-3">
+                <div className="text-[11px] text-[var(--text-lo)]">Últimos 30 dias</div>
+                <div className="text-xl font-semibold tabular-nums text-white">{brl(uso.trintaDias.usd)}</div>
+                <div className="text-[11px] text-[var(--text-md)]">{uso.trintaDias.imagens} imagens · US$ {uso.trintaDias.usd.toFixed(2)}</div>
+              </div>
+            </div>
+            {uso.porNivel.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {uso.porNivel.map((n) => (
+                  <span key={n.nivel} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-[var(--text-md)]">
+                    <b className="text-white">{n.nivel}</b> · {n.imagens} img · {brl(n.usd)}
+                  </span>
+                ))}
+              </div>
+            )}
+            {uso.ultima && (
+              <p className="mt-2 text-[11px] text-[var(--text-lo)]">
+                Última geração: {new Date(uso.ultima.em).toLocaleString("pt-BR")} · {uso.ultima.modelo}
+                {uso.ultima.por ? ` · por ${uso.ultima.por}` : ""}
+              </p>
+            )}
+          </>
+        )}
+        <p className="mt-3 text-[11px] leading-relaxed text-[var(--text-lo)]">
+          Este é o gasto <b className="text-[var(--text-md)]">contado por nós</b> a cada imagem gerada, convertido a R$ {USD_BRL.toFixed(2)}. O Google não
+          expõe o saldo pré-pago por API — para ver os créditos que sobraram, consulte o{" "}
+          <a href="https://console.cloud.google.com/billing" target="_blank" rel="noreferrer" className="text-[var(--brand-hi)] hover:underline">faturamento no Google Cloud</a>.
+          Texto e pesquisa não entram nesta conta (o custo é irrisório perto da imagem).
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ConfigView({ isDono }: { isDono: boolean }) {
   const [users, setUsers] = useState<AcessoUser[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -196,17 +434,21 @@ export function ConfigView({ isDono }: { isDono: boolean }) {
   };
 
   if (!isDono) {
-    return <Placeholder icon={<Settings size={22} />} title="Configurações" note="A gestão de acessos é restrita à conta principal da Meraki. As contas e senhas são as mesmas do Meraki Publisher." />;
+    return <Placeholder icon={<Settings size={22} />} title="Configurações" note="As configurações da plataforma — chave da IA, modelos e acessos — são restritas à conta principal da Meraki." />;
   }
 
   const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[var(--glass-brd-h)]";
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-8">
+      <h1 className="mb-5 text-xl font-bold text-white">Configurações</h1>
+
+      <ConfigIAPanel />
+
       <div className="mb-6 flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 text-[var(--brand-hi)]"><Users size={22} /></div>
         <div className="mr-auto">
-          <h1 className="text-xl font-bold text-white">Acessos</h1>
+          <h2 className="text-base font-semibold text-white">Acessos</h2>
           <p className="text-sm text-[var(--text-md)]">Gerencie quem entra na plataforma. As contas são as mesmas do Meraki Publisher.</p>
         </div>
         <button className="btn !min-h-0 !py-2" onClick={carregar} disabled={loading} title="Atualizar"><RefreshCw size={14} className={loading ? "animate-spin" : ""} /></button>

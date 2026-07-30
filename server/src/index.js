@@ -8,7 +8,9 @@ import generateRoutes from "./routes/generate.js";
 import authRoutes from "./routes/auth.js";
 import equipeRoutes from "./routes/equipe.js";
 import dataRoutes, { mediaRouter } from "./routes/data.js";
+import configRoutes from "./routes/config.js";
 import { autenticar } from "./auth.js";
+import * as settings from "./settings.js";
 
 const app = express();
 const PORT = process.env.PORT || 8787;
@@ -17,13 +19,15 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(express.json({ limit: "20mb" })); // imagens (WebP comprimido) vêm em base64
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "carrossel-meraki-server", hasKey: !!process.env.GEMINI_API_KEY, hasAuth: !!process.env.JWT_SECRET && !!process.env.USERS_DB_PATH });
+  // a chave pode vir do painel (banco) ou do .env — health reflete a que vale
+  res.json({ ok: true, service: "carrossel-meraki-server", hasKey: !!settings.get("gemini_api_key"), hasAuth: !!process.env.JWT_SECRET && !!process.env.USERS_DB_PATH });
 });
 
 app.use("/api/auth", authRoutes);          // login (aberto)
 app.use("/api/media", mediaRouter);         // servir imagens (aberto)
 app.use("/api/generate", autenticar, generateRoutes); // IA (protegida — custa saldo)
 app.use("/api/equipe", equipeRoutes);       // gestão de acessos (só conta dona)
+app.use("/api/config", configRoutes);       // chave/modelos da IA + consumo (só conta dona)
 app.use("/api", dataRoutes);                // carousels/templates/collections/me (protegido)
 
 // erro central
